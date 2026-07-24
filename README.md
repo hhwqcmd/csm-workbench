@@ -1,0 +1,32 @@
+# Seedance 2.0 视频生成演示工作台
+
+面向现场演示和方案验证的 Seedance API 控制台。工作台支持官方 API 与 Agent Plan 两条调用路径，可在同一页面完成：
+
+- 选择 API 路径、Base URL、模型和 API Key。
+- 对照官方“香水替换为面霜”示例素材。
+- 编辑提示词、素材、比例、时长、音频和水印参数。
+- 查看并编辑完整 API Request Body，和表单双向联动。
+- 创建真实任务并每 30 秒查询状态。
+- 在当前浏览器保存最近 30 次提交，查看每次创建和查询的请求/响应日志。
+
+默认连接配置为官方 API 与 `doubao-seedance-2-0-mini-260615`。
+
+## 本地运行
+
+```bash
+npm install
+npm run dev
+```
+
+默认地址为 `http://localhost:3001`（若端口占用，以开发服务器输出为准）。
+
+## 验证
+
+```bash
+npm test
+npm run lint
+python3 -m py_compile official-quickstart/python/demo_standard.py
+bash -n official-quickstart/scripts/init_dev_env/setup_mac.sh
+```
+
+架构、历史决策、安全边界、地雷和提交规范见 [AGENTS.md](./AGENTS.md)，详细调用流程见 [docs/task-runner.md](./docs/task-runner.md)。
