@@ -15,16 +15,33 @@
 
 ```bash
 npm install
-npm run dev
+./start_workbench.sh
 ```
 
-默认地址为 `http://localhost:3001`（若端口占用，以开发服务器输出为准）。
+默认地址为 `http://localhost:3001`，按 `Ctrl+C` 停止服务。脚本会检查 Node.js
+版本、端口和项目依赖，但不会自动安装依赖或打开浏览器。
+
+只检查环境：
+
+```bash
+./start_workbench.sh --check
+```
+
+临时使用其他端口：
+
+```bash
+SEEDANCE_WORKBENCH_PORT=3100 ./start_workbench.sh
+```
+
+也可直接运行 `npm run dev -- --port 3001`。
 
 ## 验证
 
 ```bash
 npm test
 npm run lint
+bash -n start_workbench.sh
+./start_workbench.sh --check
 python3 -m py_compile official-quickstart/python/demo_standard.py
 bash -n official-quickstart/scripts/init_dev_env/setup_mac.sh
 ```

@@ -61,7 +61,15 @@ export const API_PATHS = {
   },
 } as const;
 
-export const RATIOS = ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"] as const;
+export const RATIOS = [
+  "adaptive",
+  "21:9",
+  "16:9",
+  "4:3",
+  "1:1",
+  "3:4",
+  "9:16",
+] as const;
 
 export const DEFAULT_TASK = {
   prompt: "将视频1礼盒中的香水替换成图片1中的面霜，运镜不变",

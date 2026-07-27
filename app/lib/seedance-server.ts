@@ -5,6 +5,10 @@ import {
   RATIOS,
   type ApiPath,
 } from "./seedance-config";
+import type {
+  SeedanceContentItem,
+  SeedanceRequestBody,
+} from "./seedance-examples";
 
 type Connection = {
   apiPath: ApiPath;
@@ -14,13 +18,7 @@ type Connection = {
 };
 
 export type CreateTaskInput = Connection & {
-  prompt: string;
-  imageUrl: string;
-  videoUrl: string;
-  ratio: (typeof RATIOS)[number];
-  duration: number;
-  generateAudio: boolean;
-  watermark: boolean;
+  requestBody: SeedanceRequestBody;
 };
 
 export type GetTaskInput = Connection & {
@@ -32,39 +30,9 @@ export class RequestValidationError extends Error {}
 export function parseCreateTaskInput(value: unknown): CreateTaskInput {
   const body = asRecord(value);
   const connection = parseConnection(body);
-  const prompt = requiredString(body.prompt, "提示词", 2_000);
-  const imageUrl = publicHttpsUrl(body.imageUrl, "参考图片 URL");
-  const videoUrl = publicHttpsUrl(body.videoUrl, "参考视频 URL");
-  const ratio = requiredString(body.ratio, "宽高比", 8);
-  const duration = body.duration;
-
-  if (!RATIOS.includes(ratio as (typeof RATIOS)[number])) {
-    throw new RequestValidationError("宽高比不在当前 Seedance 2.0 支持范围内。");
-  }
-  if (
-    typeof duration !== "number" ||
-    !Number.isInteger(duration) ||
-    duration < 4 ||
-    duration > 15
-  ) {
-    throw new RequestValidationError("视频时长必须是 4 到 15 秒的整数。");
-  }
-  if (typeof body.generateAudio !== "boolean") {
-    throw new RequestValidationError("有声视频选项格式不正确。");
-  }
-  if (typeof body.watermark !== "boolean") {
-    throw new RequestValidationError("水印选项格式不正确。");
-  }
-
   return {
     ...connection,
-    prompt,
-    imageUrl,
-    videoUrl,
-    ratio: ratio as (typeof RATIOS)[number],
-    duration,
-    generateAudio: body.generateAudio,
-    watermark: body.watermark,
+    requestBody: parseRequestBody(body.requestBody, connection.model),
   };
 }
 
@@ -86,29 +54,7 @@ export async function createSeedanceTask(input: CreateTaskInput) {
     {
       method: "POST",
       headers: upstreamHeaders(input.apiKey),
-      body: JSON.stringify({
-        model: input.model,
-        content: [
-          {
-            type: "text",
-            text: input.prompt,
-          },
-          {
-            type: "image_url",
-            image_url: { url: input.imageUrl },
-            role: "reference_image",
-          },
-          {
-            type: "video_url",
-            video_url: { url: input.videoUrl },
-            role: "reference_video",
-          },
-        ],
-        generate_audio: input.generateAudio,
-        ratio: input.ratio,
-        duration: input.duration,
-        watermark: input.watermark,
-      }),
+      body: JSON.stringify(input.requestBody),
       signal: AbortSignal.timeout(30_000),
     },
   );
@@ -152,6 +98,7 @@ export async function getSeedanceTask(input: GetTaskInput) {
     id: stringAt(payload, "id") ?? input.taskId,
     status,
     videoUrl: content ? stringAt(content, "video_url") : undefined,
+    lastFrameUrl: content ? stringAt(content, "last_frame_url") : undefined,
     error:
       status === "failed"
         ? safeError(
@@ -190,6 +137,222 @@ function parseConnection(body: Record<string, unknown>): Connection {
   return { apiPath, baseUrl, model, apiKey };
 }
 
+function parseRequestBody(
+  value: unknown,
+  selectedModel: string,
+): SeedanceRequestBody {
+  const body = asRecord(value);
+  const allowedKeys = new Set([
+    "model",
+    "content",
+    "generate_audio",
+    "resolution",
+    "ratio",
+    "duration",
+    "watermark",
+    "return_last_frame",
+    "tools",
+  ]);
+  const unsupportedKey = Object.keys(body).find((key) => !allowedKeys.has(key));
+  if (unsupportedKey) {
+    throw new RequestValidationError(
+      `Request Body 包含未开放转发的字段：${unsupportedKey}。`,
+    );
+  }
+
+  const model = requiredString(body.model, "model", 120);
+  if (model !== selectedModel) {
+    throw new RequestValidationError("Request Body 的 model 必须与模型选择器一致。");
+  }
+  if (!Array.isArray(body.content) || body.content.length < 1) {
+    throw new RequestValidationError("content 必须是非空数组。");
+  }
+
+  const content = body.content.map(parseContentItem);
+  if (content.filter((item) => item.type === "text").length !== 1) {
+    throw new RequestValidationError("content 必须且只能包含一项 text。");
+  }
+  const counts = {
+    image_url: content.filter((item) => item.type === "image_url").length,
+    video_url: content.filter((item) => item.type === "video_url").length,
+    audio_url: content.filter((item) => item.type === "audio_url").length,
+  };
+  if (counts.image_url > 9 || counts.video_url > 3 || counts.audio_url > 3) {
+    throw new RequestValidationError(
+      "参考素材上限为 9 张图片、3 段视频和 3 段音频。",
+    );
+  }
+  const firstFrames = content.filter(
+    (item) => item.type === "image_url" && item.role === "first_frame",
+  ).length;
+  const lastFrames = content.filter(
+    (item) => item.type === "image_url" && item.role === "last_frame",
+  ).length;
+  if (
+    (firstFrames > 0 || lastFrames > 0) &&
+    (firstFrames !== 1 ||
+      lastFrames !== 1 ||
+      counts.image_url !== 2 ||
+      counts.video_url !== 0 ||
+      counts.audio_url !== 0)
+  ) {
+    throw new RequestValidationError(
+      "首尾帧模式必须且只能包含一张 first_frame 和一张 last_frame 图片。",
+    );
+  }
+
+  const ratio = requiredString(body.ratio, "ratio", 12);
+  if (!RATIOS.includes(ratio as (typeof RATIOS)[number])) {
+    throw new RequestValidationError("ratio 不在当前支持范围内。");
+  }
+  const duration = body.duration;
+  if (
+    typeof duration !== "number" ||
+    !Number.isInteger(duration) ||
+    duration < 4 ||
+    duration > 15
+  ) {
+    throw new RequestValidationError("duration 必须是 4 到 15 的整数。");
+  }
+  if (
+    body.generate_audio !== undefined &&
+    typeof body.generate_audio !== "boolean"
+  ) {
+    throw new RequestValidationError("generate_audio 必须是布尔值或省略。");
+  }
+  if (typeof body.watermark !== "boolean") {
+    throw new RequestValidationError("watermark 必须是布尔值。");
+  }
+  if (
+    body.return_last_frame !== undefined &&
+    typeof body.return_last_frame !== "boolean"
+  ) {
+    throw new RequestValidationError("return_last_frame 必须是布尔值或省略。");
+  }
+  const resolution = body.resolution;
+  if (
+    resolution !== undefined &&
+    !["480p", "720p", "1080p", "4k"].includes(String(resolution))
+  ) {
+    throw new RequestValidationError(
+      "resolution 只支持 480p、720p、1080p 或 4k。",
+    );
+  }
+  if (
+    resolution === "4k" &&
+    model !== "doubao-seedance-2-0-260128" &&
+    model !== "doubao-seedance-2.0"
+  ) {
+    throw new RequestValidationError("4K 仅支持 Seedance 2.0 完整模型。");
+  }
+
+  let tools: Array<{ type: "web_search" }> | undefined;
+  if (body.tools !== undefined) {
+    if (
+      !Array.isArray(body.tools) ||
+      body.tools.length !== 1 ||
+      !isWebSearchTool(body.tools[0])
+    ) {
+      throw new RequestValidationError(
+        "tools 当前只支持 [{\"type\":\"web_search\"}]。",
+      );
+    }
+    if (content.some((item) => item.type !== "text")) {
+      throw new RequestValidationError("联网搜索能力仅适用于纯文本输入。");
+    }
+    tools = [{ type: "web_search" }];
+  }
+
+  const parsed: SeedanceRequestBody = {
+    model,
+    content,
+    ratio: ratio as SeedanceRequestBody["ratio"],
+    duration,
+    watermark: body.watermark,
+  };
+  if (body.generate_audio !== undefined) {
+    parsed.generate_audio = body.generate_audio;
+  }
+  if (body.return_last_frame !== undefined) {
+    parsed.return_last_frame = body.return_last_frame;
+  }
+  if (resolution !== undefined) {
+    parsed.resolution = resolution as SeedanceRequestBody["resolution"];
+  }
+  if (tools) parsed.tools = tools;
+  return parsed;
+}
+
+function parseContentItem(value: unknown): SeedanceContentItem {
+  const item = asRecord(value);
+  const type = requiredString(item.type, "content.type", 32);
+  if (type === "text") {
+    return {
+      type: "text",
+      text: requiredString(item.text, "提示词", 10_000),
+    };
+  }
+
+  const definitions = {
+    image_url: "image_url",
+    video_url: "video_url",
+    audio_url: "audio_url",
+  } as const;
+  if (!(type in definitions)) {
+    throw new RequestValidationError(
+      "content.type 只支持 text、image_url、video_url 或 audio_url。",
+    );
+  }
+  const mediaType = type as keyof typeof definitions;
+  const payloadKey = definitions[mediaType];
+  const payload = asRecord(item[payloadKey]);
+  const url = publicMediaUrl(payload.url, `${payloadKey}.url`);
+  if (mediaType === "image_url") {
+    const role = item.role;
+    if (
+      role !== undefined &&
+      role !== "reference_image" &&
+      role !== "first_frame" &&
+      role !== "last_frame"
+    ) {
+      throw new RequestValidationError(
+        "image_url 的 role 只支持 reference_image、first_frame、last_frame 或省略。",
+      );
+    }
+    return role
+      ? { type: mediaType, image_url: { url }, role }
+      : { type: mediaType, image_url: { url } };
+  }
+  if (mediaType === "video_url") {
+    if (item.role !== "reference_video") {
+      throw new RequestValidationError(
+        "video_url 的 role 必须是 reference_video。",
+      );
+    }
+    return {
+      type: mediaType,
+      video_url: { url },
+      role: "reference_video",
+    };
+  }
+  if (item.role !== "reference_audio") {
+    throw new RequestValidationError(
+      "audio_url 的 role 必须是 reference_audio。",
+    );
+  }
+  return {
+    type: mediaType,
+    audio_url: { url },
+    role: "reference_audio",
+  };
+}
+
+function isWebSearchTool(value: unknown): value is { type: "web_search" } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const tool = value as Record<string, unknown>;
+  return Object.keys(tool).length === 1 && tool.type === "web_search";
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new RequestValidationError("请求格式不正确。");
@@ -215,8 +378,17 @@ function requiredString(value: unknown, label: string, maxLength: number): strin
   return trimmed;
 }
 
-function publicHttpsUrl(value: unknown, label: string): string {
+function publicMediaUrl(value: unknown, label: string): string {
   const raw = requiredString(value, label, 2_000);
+  if (raw.startsWith("asset://")) {
+    if (!/^asset:\/\/asset-[A-Za-z0-9-]+$/.test(raw)) {
+      throw new RequestValidationError(
+        `${label}的预置素材 ID 必须使用 asset://asset-* 格式。`,
+      );
+    }
+    return raw;
+  }
+
   let url: URL;
   try {
     url = new URL(raw);

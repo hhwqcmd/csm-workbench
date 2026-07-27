@@ -1,3 +1,4 @@
+import { SeedanceExampleGallery } from "./components/SeedanceExampleGallery";
 import { SeedanceTaskRunner } from "./components/SeedanceTaskRunner";
 
 export default function Home() {
@@ -84,85 +85,7 @@ export default function Home() {
         </aside>
       </section>
 
-      <section className="sample-section" id="sample">
-        <div className="section-heading sample-heading">
-          <div>
-            <p className="eyebrow">官方示例任务</p>
-            <h2>把香水替换成面霜</h2>
-          </div>
-          <p>
-            先用固定样例说明输入与目标，再进入下方实操控制台。所有默认素材和参数都来自这一演示基线。
-          </p>
-        </div>
-
-        <div className="sample-layout">
-          <article className="prompt-card">
-            <div className="terminal-bar">
-              <span />
-              <span />
-              <span />
-              <small>official demo baseline</small>
-            </div>
-            <div className="prompt-body">
-              <span className="prompt-label">PROMPT</span>
-              <blockquote>“将视频1礼盒中的香水替换成图片1中的面霜，运镜不变”</blockquote>
-              <dl>
-                <div>
-                  <dt>默认通道</dt>
-                  <dd>官方 API · 标准按量调用</dd>
-                </div>
-                <div>
-                  <dt>默认模型</dt>
-                  <dd>doubao-seedance-2-0-mini-260615</dd>
-                </div>
-                <div>
-                  <dt>输入素材</dt>
-                  <dd>1 张参考图片 + 1 段参考视频</dd>
-                </div>
-                <div>
-                  <dt>输出规格</dt>
-                  <dd>16:9 · 5 秒 · 有声 · 带水印</dd>
-                </div>
-                <div>
-                  <dt>演示链路</dt>
-                  <dd>审核请求 → 创建任务 → 轮询 → 结果与日志</dd>
-                </div>
-              </dl>
-            </div>
-          </article>
-
-          <div className="media-grid">
-            <figure className="media-card">
-              <div className="media-frame image-frame">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="https://ark-project.tos-cn-beijing.volces.com/doc_image/r2v_edit_pic1.jpg"
-                  alt="官方教程中的面霜参考图片"
-                />
-              </div>
-              <figcaption>
-                <span>图片 1</span>
-                替换目标 · 面霜
-              </figcaption>
-            </figure>
-            <figure className="media-card">
-              <div className="media-frame video-frame">
-                <video
-                  src="https://ark-project.tos-cn-beijing.volces.com/doc_video/r2v_edit_video1.mp4"
-                  controls
-                  muted
-                  playsInline
-                  preload="metadata"
-                />
-              </div>
-              <figcaption>
-                <span>视频 1</span>
-                原始素材 · 礼盒香水
-              </figcaption>
-            </figure>
-          </div>
-        </div>
-      </section>
+      <SeedanceExampleGallery />
 
       <section className="config-section" id="operations">
         <div className="section-heading">

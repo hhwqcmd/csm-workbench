@@ -18,6 +18,8 @@
 - `app/`：演示工作台的产品界面。
   - 关键入口：`app/page.tsx`。
   - 双路径选择、任务参数、完整 API 编辑、费用确认、执行、轮询、历史与日志 UI：`app/components/SeedanceTaskRunner.tsx`。
+  - 七个官方示例的提示词、素材、参数、模型选择和连续生成计划：`app/lib/seedance-examples.ts`。
+  - 示例卡片与“填入参数”入口：`app/components/SeedanceExampleGallery.tsx`。
   - 路径、模型、比例和官方示例默认值：`app/lib/seedance-config.ts`。
   - 服务端校验、上游请求与错误脱敏：`app/lib/seedance-server.ts`。
   - 创建任务入口：`app/api/seedance/tasks/route.ts`。
@@ -25,6 +27,7 @@
   - 全局视觉与响应式规则：`app/globals.css`。
   - 元数据与页面语言：`app/layout.tsx`。
   - 真实 API 调用必须经同源服务端入口；浏览器不得直连火山方舟。
+- `start_workbench.sh`：本地 Web 工作台启动入口。负责检查 Node.js、端口和依赖后以前台进程启动开发服务器；不得在此脚本中加入自动安装、浏览器操作或真实任务调用。
 - `worker/`、`build/`、`vite.config.ts`：vinext/Cloudflare Worker 运行与构建适配层。
   - 只有新增服务端路由、持久化或托管能力时才进入这里。
 - `db/`、`drizzle/`：预留的 D1/Drizzle 数据层。
@@ -45,6 +48,7 @@
 - 需要理解模块边界、数据流或安全边界：读 `docs/architecture.md`。
 - 需要检查或重建 Python 环境：读 `docs/environment.md`。
 - 需要理解真实任务创建、轮询和密钥传递边界：读 `docs/task-runner.md`。
+- 需要修改七个官方示例、首尾帧/连续生成逻辑或判断 Mini / 完整模型能力：读 `docs/official-examples.md`。
 - 需要回到官方原始说明：从 `docs/README.md` 的官方链接进入。
 - 需要修改模型参数或输入限制：先查官方教程最新版本，再更新本地决策记录；不要只凭示例代码推断。
 
@@ -53,8 +57,8 @@
 - 官方样例固定使用 Python 3.12，并由 `uv` 创建 `.venv`、安装 `volcengine-python-sdk[ark]`。
 - 当前已验证的本地环境是 Python 3.12.13、uv 0.11.26、`volcengine-python-sdk` 5.0.42；版本变化时先更新 `docs/environment.md`，不要假设环境仍一致。
 - Web 工作台使用 Node.js `>=22.13.0`、vinext 与 Cloudflare Worker 兼容 ESM 输出。
-- 本地 Web 预览通过 `npm run dev`；托管声明位于 `.openai/hosting.json`。
-- 本项目选择 Agent Plan 路径：SDK Base URL 固定为 `https://ark.cn-beijing.volces.com/api/plan/v3`；创建任务完整地址为 `https://ark.cn-beijing.volces.com/api/plan/v3/contents/generations/tasks`。
+- 本地 Web 预览优先通过 `./start_workbench.sh` 启动，底层仍是 `npm run dev`；默认端口 3001，可用 `SEEDANCE_WORKBENCH_PORT` 覆盖。托管声明位于 `.openai/hosting.json`。
+- 工作台同时支持标准 API 与 Agent Plan。默认是标准 API + `doubao-seedance-2-0-mini-260615`；Agent Plan Base URL 固定为 `https://ark.cn-beijing.volces.com/api/plan/v3`。
 - `AGENT_API_KEY` 是 Agent Plan 专属 Secret。普通方舟 API Key 或 Coding Plan API Key 不能混用。禁止使用 `NEXT_PUBLIC_` 前缀，禁止写入源码、测试快照、URL、Cookie、日志或服务端渲染回显。
 - 工作台按演示需求提供 API Key 手工输入、显示/隐藏和“在当前浏览器记住”控件。记住模式默认开启，将标准 API 与 Agent Plan 的 Key 分别存入当前浏览器 `localStorage`；只适合受控的个人演示设备。关闭记住模式时必须删除已保存凭证。
 - 任务历史最多保留 30 条，存于当前浏览器 `localStorage`；每次点击提交立即建档，成功与失败创建都保留，并追加创建/查询的请求响应日志。刷新后恢复最近的排队/运行任务并继续轮询。它不是跨设备、跨浏览器或服务端审计记录。
@@ -63,7 +67,9 @@
 - 服务端只允许两组精确 Base URL：标准 API `/api/v3` 与 Agent Plan `/api/plan/v3`。不得把工作台改造成可代理任意主机的通用转发器。
 - 模型选择器按 API 路径维护两组官方当前清单：标准 API 使用带日期版本的 Model ID，Agent Plan 使用套餐别名。新增、下线或弃用状态必须以最新官方模型列表与 Agent Plan“接入视觉模型”文档为准。
 - Agent Plan 模型使用套餐别名（当前目标为 `doubao-seedance-2.0`），不要直接沿用标准教程的日期版本 ID `doubao-seedance-2-0-260128`。
-- 官方素材 URL 必须公网可访问；换成自有素材时，优先使用 TOS 并按实际安全要求配置访问策略。
+- 一般素材 URL 必须公网可访问；官方预置虚拟人像可使用严格的 `asset://asset-*` ID。换成自有素材时，优先使用 TOS 并按实际安全要求配置访问策略。
+- Mini 支持多模态、编辑和延长，优先用于示例一至三；4K 仅完整 `doubao-seedance-2-0-260128` 支持。联网搜索只允许纯文本并使用 `tools: [{"type":"web_search"}]`。
+- 首尾帧图片角色必须分别是 `first_frame`、`last_frame`。连续生成按官方示例使用完整模型和 `return_last_frame: true`；只有收到 `last_frame_url` 后才能创建下一段。
 
 ## 架构意图和历史决策
 
@@ -86,6 +92,15 @@
 - 2026-07-24：默认连接改为官方 API + `doubao-seedance-2-0-mini-260615`；切换回官方路径也回到该默认模型。
 - 2026-07-24：提交前新增完整 API 详情。Method、URL、Headers 实时展示，Request Body 可编辑并通过显式“应用参数”回写上方表单，避免两套参数状态漂移。
 - 2026-07-24：每次点击提交先创建本地历史记录，再发起网络请求；每轮创建和状态查询都追加脱敏的请求/响应日志，因此没有取得远端 task ID 的失败提交也可复盘。
+- 2026-07-24：官方示例扩展为编辑、多模态参考、延长、4K 与联网搜索五项，统一由 `seedance-examples.ts` 提供整份请求体和“填入参数”行为。
+- 2026-07-24：请求状态从固定“一图一视频”升级为通用多模态数组；服务端仍只转发显式白名单字段，并额外限制素材数量、4K 模型和联网搜索纯文本输入。
+- 2026-07-24：五个官方示例均通过标准 API 真实验证并到达 `succeeded`。任务一至三与任务五使用 Mini；任务四因 4K 限制使用完整模型。刷新后确认 5 条历史、结果入口和结构化日志均可恢复。
+- 2026-07-24：视觉语言统一为“深色演示区 + 浅色操作区 + 荧光绿状态强调”。官方示例使用 6 栏响应式卡片网格，标题与规格在卡片内显式使用深色，不再继承深色 section 的浅色前景；这项显式颜色约束用于保证白色、荧光绿和浅色功能卡上的可读性。
+- 2026-07-24：新增“使用预置虚拟人像”作为第六个官方示例；预置人物由 `asset://asset-*` 传入，服务端仅为这种严格格式开例外，不把素材校验放宽成任意协议转发。
+- 2026-07-24：第六个预置虚拟人像示例使用 Mini 通过标准 API 真实验证并到达 `succeeded`；刷新后确认 6 条历史、结果入口和 7 条结构化日志可恢复，Authorization 仍为掩码。因此该示例无需切换完整模型。
+- 2026-07-25：新增 `start_workbench.sh` 作为本地演示统一启动入口。脚本只做环境检查并以前台进程启动开发服务器，不自动安装依赖或打开浏览器，避免现场演示时产生隐藏下载、后台残留进程或意外外部操作。
+- 2026-07-27：新增第七个“图生视频-基于首尾帧（含音频）”示例，并把官方“生成多个连续视频”实现为三段串行链路。选择串行而非并发，是因为下一段必须依赖上一段返回的尾帧；每段仍作为独立历史与日志记录，便于逐段复盘费用和失败点。
+- 2026-07-27：标准官方 API 真实验证中，教程自带女孩首尾帧被当前真人隐私审核拒绝，但替换为已通过审核的官方插画与连续任务尾帧后，相同首尾帧角色、5 秒、`adaptive`、有声请求成功。三段连续任务全部成功并逐段返回视频和尾帧，证明 `return_last_frame` 依赖传递有效。
 
 ## 地雷
 
@@ -100,9 +115,15 @@
 - 不要删除 `SeedanceTaskRunner` 的 `pollCycle` 重调度逻辑。仅依赖任务状态变化会在上游连续返回 `running` 时停止轮询。
 - 浏览器历史只记录启用该功能后的任务；改造前已因刷新丢失的任务若没有 task ID，无法从前端恢复。
 - 任何调试输出都不得记录 API Key 或完整 Authorization 请求头；浏览器本地保存是明确的演示便利选项，不代表可以放宽服务端日志边界。
+- `.sample-section` 的默认前景是浅色，示例卡片却是浅色背景。修改示例卡时必须保留 `.example-card h3/dd/p` 的显式深色前景；只依赖继承会再次造成低对比度。
+- 预置虚拟人像的 Asset ID 必须放在 `content.image_url.url`，提示词仍按素材顺序称“图片1”；不要把 Asset ID 写进提示词，也不要把 `asset://` 放宽成任意资源协议。
+- 不要把首尾帧图片重写成普通 `reference_image`；角色丢失会改变生成模式。连续链路的单首帧输入按官方代码省略 role，并必须同时请求 `return_last_frame: true`。
+- 教程自带 `seepro_first_frame.jpeg` / `seepro_last_frame.jpeg` 在 2026-07-27 真实调用中触发 `InputImageSensitiveContentDetected.PrivacyInformation`。保留它们作为官方协议基线，但排查失败时先查看结构化日志；不要反复重试同一真人素材，也不要为绕过审核而放宽校验。
+- 连续链路不能并发创建，也不能在上一段失败或缺少 `last_frame_url` 时继续。页面刷新会保留已经创建的任务，但不会自动补建尚未开始的后续段。
 - 历史记录的 `id` 是本地稳定记录 ID，远端任务号在 `taskId`；不要再假设两者相同。旧版记录没有 `taskId` 或 `logs` 时仍需兼容读取。
 - `.env.example` 必须只保留空占位符；它被允许提交，严禁写入真实或看似真实的 Key。
 - API 路由测试只能模拟火山方舟响应；禁止在 `npm test`、页面 SSR 或健康检查中使用真实 Key。
+- `start_workbench.sh` 必须保持为纯本地启动入口；不得读取或注入 API Key，也不得把真实任务创建绑定到启动过程。
 - `dist/`、`.next/`、`.wrangler/`、`node_modules/`、`.venv/` 是生成目录，不做手工修改，不提交。
 - `.openai/hosting.json` 的站点 ID（产生后）是不可改写的托管标识；不得伪造、推导或替换。
 - 未经明确需求不要修改 `app/chatgpt-auth.ts`、`worker/` 或启用 `db/`；它们是平台能力边界，不是本教程的当前步骤。
@@ -115,6 +136,8 @@
 npm run build
 npm test
 npm run lint
+bash -n start_workbench.sh
+./start_workbench.sh --check
 python3 -m py_compile official-quickstart/python/demo_standard.py
 bash -n official-quickstart/scripts/init_dev_env/setup_mac.sh
 ```

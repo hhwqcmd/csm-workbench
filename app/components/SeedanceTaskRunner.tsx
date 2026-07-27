@@ -3,11 +3,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   API_PATHS,
-  DEFAULT_TASK,
   isAllowedModel,
   RATIOS,
   type ApiPath,
 } from "../lib/seedance-config";
+import {
+  DEFAULT_REQUEST_BODY,
+  type SeedanceContentItem,
+  type SeedanceExample,
+  type SeedanceImageRole,
+  type SeedanceMediaType,
+  type SeedanceRequestBody,
+  type SeedanceSequencePlan,
+} from "../lib/seedance-examples";
+import { APPLY_EXAMPLE_EVENT } from "./SeedanceExampleGallery";
 
 type TaskStatus =
   | "draft"
@@ -21,6 +30,7 @@ type TaskResponse = {
   id?: string;
   status?: string;
   videoUrl?: string;
+  lastFrameUrl?: string;
   error?: string;
 };
 
@@ -60,17 +70,36 @@ type HistoryRecord = {
   referenceVideoUrl: string;
   ratio: (typeof RATIOS)[number];
   duration: number;
-  generateAudio: boolean;
+  generateAudio?: boolean;
   watermark: boolean;
   status: HistoryStatus;
   resultVideoUrl?: string;
+  resultLastFrameUrl?: string;
   error?: string;
   logs?: TaskLogEntry[];
+  requestBody?: SeedanceRequestBody;
+  exampleTitle?: string;
+};
+
+type SequenceStep = {
+  prompt: string;
+  status:
+    | "pending"
+    | "submitting"
+    | "queued"
+    | "running"
+    | "succeeded"
+    | "failed";
+  taskId?: string;
+  videoUrl?: string;
+  lastFrameUrl?: string;
+  error?: string;
 };
 
 type RememberedCredentials = Partial<Record<ApiPath, string>>;
 
 const POLL_SECONDS = 30;
+const SEQUENCE_POLL_SECONDS = 10;
 const HISTORY_STORAGE_KEY = "seedance-workbench:task-history:v1";
 const CREDENTIAL_STORAGE_KEY = "seedance-workbench:demo-credentials:v1";
 const MAX_HISTORY_RECORDS = 30;
@@ -83,23 +112,37 @@ export function SeedanceTaskRunner() {
   );
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
-  const [prompt, setPrompt] = useState(DEFAULT_TASK.prompt as string);
-  const [imageUrl, setImageUrl] = useState(DEFAULT_TASK.imageUrl as string);
-  const [videoUrl, setVideoUrl] = useState(DEFAULT_TASK.videoUrl as string);
+  const [prompt, setPrompt] = useState(getPrompt(DEFAULT_REQUEST_BODY));
+  const [mediaItems, setMediaItems] = useState(() =>
+    getMediaItems(DEFAULT_REQUEST_BODY),
+  );
   const [ratio, setRatio] = useState<(typeof RATIOS)[number]>(
-    DEFAULT_TASK.ratio,
+    DEFAULT_REQUEST_BODY.ratio,
   );
-  const [duration, setDuration] = useState(DEFAULT_TASK.duration as number);
-  const [generateAudio, setGenerateAudio] = useState(
-    DEFAULT_TASK.generateAudio as boolean,
+  const [duration, setDuration] = useState(DEFAULT_REQUEST_BODY.duration);
+  const [generateAudio, setGenerateAudio] = useState<boolean | undefined>(
+    DEFAULT_REQUEST_BODY.generate_audio,
   );
-  const [watermark, setWatermark] = useState(
-    DEFAULT_TASK.watermark as boolean,
+  const [watermark, setWatermark] = useState(DEFAULT_REQUEST_BODY.watermark);
+  const [resolution, setResolution] =
+    useState<SeedanceRequestBody["resolution"]>();
+  const [webSearch, setWebSearch] = useState(false);
+  const [returnLastFrame, setReturnLastFrame] = useState(false);
+  const [selectedExampleTitle, setSelectedExampleTitle] = useState(
+    "官方示例任务一：把香水替换成面霜",
   );
+  const [selectedSequencePlan, setSelectedSequencePlan] =
+    useState<SeedanceSequencePlan>();
+  const [sequenceConfirmed, setSequenceConfirmed] = useState(false);
+  const [sequenceStatus, setSequenceStatus] =
+    useState<"idle" | "running" | "succeeded" | "failed">("idle");
+  const [sequenceError, setSequenceError] = useState("");
+  const [sequenceSteps, setSequenceSteps] = useState<SequenceStep[]>([]);
   const [costConfirmed, setCostConfirmed] = useState(false);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("draft");
   const [taskId, setTaskId] = useState("");
   const [resultVideoUrl, setResultVideoUrl] = useState("");
+  const [resultLastFrameUrl, setResultLastFrameUrl] = useState("");
   const [taskError, setTaskError] = useState("");
   const [nextPollIn, setNextPollIn] = useState<number | null>(null);
   const [pollCycle, setPollCycle] = useState(0);
@@ -114,41 +157,61 @@ export function SeedanceTaskRunner() {
   const pollingRef = useRef(false);
 
   const selectedPath = API_PATHS[apiPath];
-  const active = ["submitting", "queued", "running"].includes(taskStatus);
+  const singleTaskActive = ["submitting", "queued", "running"].includes(
+    taskStatus,
+  );
+  const active = singleTaskActive || sequenceStatus === "running";
   const baseUrlMatches = baseUrl.replace(/\/$/, "") === selectedPath.baseUrl;
   const modelMatches = isAllowedModel(apiPath, model);
   const requestReady =
     Boolean(apiKey.trim()) &&
     Boolean(prompt.trim()) &&
-    Boolean(imageUrl.trim()) &&
-    Boolean(videoUrl.trim()) &&
+    mediaItems.every((item) => Boolean(item.url.trim())) &&
     baseUrlMatches &&
     modelMatches &&
     duration >= 4 &&
     duration <= 15 &&
+    mediaRolesValid(mediaItems) &&
+    (!webSearch || mediaItems.length === 0) &&
+    (resolution !== "4k" ||
+      model === "doubao-seedance-2-0-260128" ||
+      model === "doubao-seedance-2.0") &&
     costConfirmed &&
+    !active;
+  const sequenceReady =
+    Boolean(selectedSequencePlan) &&
+    Boolean(apiKey.trim()) &&
+    apiPath === "official" &&
+    baseUrlMatches &&
+    modelMatches &&
+    model === selectedSequencePlan?.model &&
+    sequenceConfirmed &&
     !active;
   const upstreamRequestBody = useMemo(
     () =>
       buildUpstreamRequestBody({
         model,
         prompt,
-        imageUrl,
-        videoUrl,
+        mediaItems,
         ratio,
         duration,
         generateAudio,
         watermark,
+        resolution,
+        webSearch,
+        returnLastFrame,
       }),
     [
       duration,
       generateAudio,
-      imageUrl,
+      mediaItems,
       model,
       prompt,
       ratio,
-      videoUrl,
+      resolution,
+      returnLastFrame,
       watermark,
+      webSearch,
     ],
   );
   const upstreamRequestBodyJson = useMemo(
@@ -236,6 +299,9 @@ export function SeedanceTaskRunner() {
     }, 0);
 
     return () => window.clearTimeout(restoreTimer);
+    // Hydration restore is intentionally a one-time action; later history changes
+    // are persisted by the dedicated storage effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -254,6 +320,32 @@ export function SeedanceTaskRunner() {
     writeCredentials(credentials);
   }, [apiKey, apiPath, rememberApiKey, storageReady]);
 
+  useEffect(() => {
+    function handleApplyExample(event: Event) {
+      if (active) return;
+      const example = (event as CustomEvent<SeedanceExample>).detail;
+      if (!example?.requestBody) return;
+      setApiPath("official");
+      setBaseUrl(API_PATHS.official.baseUrl);
+      setSelectedExampleTitle(example.title);
+      setSelectedSequencePlan(example.continuousSequence);
+      setSequenceSteps(
+        example.continuousSequence?.prompts.map((sequencePrompt) => ({
+          prompt: sequencePrompt,
+          status: "pending",
+        })) ?? [],
+      );
+      setSequenceStatus("idle");
+      setSequenceError("");
+      setSequenceConfirmed(false);
+      applyRequestBody(example.requestBody);
+    }
+
+    window.addEventListener(APPLY_EXAMPLE_EVENT, handleApplyExample);
+    return () =>
+      window.removeEventListener(APPLY_EXAMPLE_EVENT, handleApplyExample);
+  });
+
   function selectPath(nextPath: ApiPath) {
     if (active) return;
     const nextConfig = API_PATHS[nextPath];
@@ -270,17 +362,41 @@ export function SeedanceTaskRunner() {
     setBaseUrl(record.baseUrl);
     setModel(record.model);
     setApiKey(rememberedKey);
-    setPrompt(record.prompt);
-    setImageUrl(record.imageUrl);
-    setVideoUrl(record.referenceVideoUrl);
-    setRatio(record.ratio);
-    setDuration(record.duration);
-    setGenerateAudio(record.generateAudio);
-    setWatermark(record.watermark);
+    if (record.requestBody) {
+      applyRequestBody(record.requestBody, false);
+    } else {
+      setPrompt(record.prompt);
+      setMediaItems(
+        [
+          record.imageUrl
+            ? {
+                type: "image_url" as const,
+                url: record.imageUrl,
+                role: "reference_image" as const,
+              }
+            : null,
+          record.referenceVideoUrl
+            ? {
+                type: "video_url" as const,
+                url: record.referenceVideoUrl,
+                role: "reference_video" as const,
+              }
+            : null,
+        ].filter(Boolean) as MediaEditorItem[],
+      );
+      setRatio(record.ratio);
+      setDuration(record.duration);
+      setGenerateAudio(record.generateAudio);
+      setWatermark(record.watermark);
+      setResolution(undefined);
+      setWebSearch(false);
+    }
+    setSelectedExampleTitle(record.exampleTitle ?? "历史任务");
     setTaskStatus(record.status);
     setTaskId(record.taskId ?? record.id);
     setActiveHistoryId(record.id);
     setResultVideoUrl(record.resultVideoUrl ?? "");
+    setResultLastFrameUrl(record.resultLastFrameUrl ?? "");
     setTaskError(record.error ?? "");
     setNextPollIn(
       record.status === "queued" || record.status === "running"
@@ -291,12 +407,32 @@ export function SeedanceTaskRunner() {
     setPollCycle((current) => current + 1);
   }
 
+  function applyRequestBody(
+    body: SeedanceRequestBody,
+    shouldReset = true,
+  ) {
+    setModel(body.model);
+    setPrompt(getPrompt(body));
+    setMediaItems(getMediaItems(body));
+    setRatio(body.ratio);
+    setDuration(body.duration);
+    setGenerateAudio(body.generate_audio);
+    setWatermark(body.watermark);
+    setResolution(body.resolution);
+    setWebSearch(body.tools?.some((tool) => tool.type === "web_search") ?? false);
+    setReturnLastFrame(body.return_last_frame ?? false);
+    setApiBodyEditing(false);
+    setApiBodyError("");
+    if (shouldReset) resetTaskResult();
+  }
+
   function resetTaskResult() {
     setCostConfirmed(false);
     setTaskStatus("draft");
     setTaskId("");
     setActiveHistoryId("");
     setResultVideoUrl("");
+    setResultLastFrameUrl("");
     setTaskError("");
     setNextPollIn(null);
   }
@@ -343,6 +479,7 @@ export function SeedanceTaskRunner() {
       setTaskStatus(normalizedStatus);
       setTaskError(payload.error ?? "");
       if (payload.videoUrl) setResultVideoUrl(payload.videoUrl);
+      if (payload.lastFrameUrl) setResultLastFrameUrl(payload.lastFrameUrl);
       appendHistoryLog(
         historyRecordId,
         {
@@ -354,6 +491,7 @@ export function SeedanceTaskRunner() {
         {
           status: normalizedStatus,
           resultVideoUrl: payload.videoUrl,
+          resultLastFrameUrl: payload.lastFrameUrl,
           error: payload.error,
         },
       );
@@ -422,17 +560,7 @@ export function SeedanceTaskRunner() {
   function applyApiBodyDraft() {
     try {
       const next = parseEditableApiBody(apiBodyDraft, apiPath);
-      setModel(next.model);
-      setPrompt(next.prompt);
-      setImageUrl(next.imageUrl);
-      setVideoUrl(next.videoUrl);
-      setRatio(next.ratio);
-      setDuration(next.duration);
-      setGenerateAudio(next.generateAudio);
-      setWatermark(next.watermark);
-      setApiBodyEditing(false);
-      setApiBodyError("");
-      resetTaskResult();
+      applyRequestBody(next);
     } catch (error) {
       setApiBodyError(
         error instanceof Error ? error.message : "API 请求体格式不正确。",
@@ -469,6 +597,7 @@ export function SeedanceTaskRunner() {
     setTaskStatus("submitting");
     setTaskError("");
     setResultVideoUrl("");
+    setResultLastFrameUrl("");
     setTaskId("");
     setActiveHistoryId(attemptId);
     upsertHistory({
@@ -479,12 +608,15 @@ export function SeedanceTaskRunner() {
       baseUrl,
       model,
       prompt,
-      imageUrl,
-      referenceVideoUrl: videoUrl,
+      imageUrl: mediaItems.find((item) => item.type === "image_url")?.url ?? "",
+      referenceVideoUrl:
+        mediaItems.find((item) => item.type === "video_url")?.url ?? "",
       ratio,
       duration,
       generateAudio,
       watermark,
+      requestBody: upstreamRequestBody,
+      exampleTitle: selectedExampleTitle,
       status: "submitting",
       logs: [createRequestLog],
     });
@@ -496,13 +628,7 @@ export function SeedanceTaskRunner() {
         cache: "no-store",
         body: JSON.stringify({
           ...connectionPayload(),
-          prompt,
-          imageUrl,
-          videoUrl,
-          ratio,
-          duration,
-          generateAudio,
-          watermark,
+          requestBody: upstreamRequestBody,
         }),
       });
       const payload = (await response.json()) as TaskResponse;
@@ -547,6 +673,268 @@ export function SeedanceTaskRunner() {
         ],
       });
     }
+  }
+
+  function patchSequenceStep(index: number, patch: Partial<SequenceStep>) {
+    setSequenceSteps((current) =>
+      current.map((step, stepIndex) =>
+        stepIndex === index ? { ...step, ...patch } : step,
+      ),
+    );
+  }
+
+  async function runContinuousSequence() {
+    const plan = selectedSequencePlan;
+    if (!plan || !sequenceReady) return;
+
+    setSequenceStatus("running");
+    setSequenceError("");
+    setSequenceSteps(
+      plan.prompts.map((sequencePrompt) => ({
+        prompt: sequencePrompt,
+        status: "pending",
+      })),
+    );
+
+    let currentFrameUrl = plan.initialImageUrl;
+
+    try {
+      for (const [index, sequencePrompt] of plan.prompts.entries()) {
+        const attemptId = createLocalHistoryId();
+        const submittedAt = new Date().toISOString();
+        const sequenceTitle = `生成多个连续视频 · 第 ${index + 1}/${plan.prompts.length} 段`;
+        const requestBody: SeedanceRequestBody = {
+          model: plan.model,
+          content: [
+            { type: "text", text: sequencePrompt },
+            {
+              type: "image_url",
+              image_url: { url: currentFrameUrl },
+            },
+          ],
+          return_last_frame: true,
+          ratio: plan.ratio,
+          duration: plan.duration,
+          watermark: plan.watermark,
+        };
+        const createRequest: TaskLogEntry["request"] = {
+          method: "POST",
+          url: createEndpoint,
+          headers: {
+            authorization: `Bearer ${maskApiKey(apiKey)}`,
+            "content-type": "application/json",
+          },
+          body: requestBody,
+        };
+        const createLog: TaskLogEntry = {
+          at: submittedAt,
+          phase: "create",
+          request: createRequest,
+        };
+
+        patchSequenceStep(index, { status: "submitting", error: undefined });
+        upsertHistory({
+          id: attemptId,
+          createdAt: submittedAt,
+          updatedAt: submittedAt,
+          apiPath,
+          baseUrl,
+          model: plan.model,
+          prompt: sequencePrompt,
+          imageUrl: currentFrameUrl,
+          referenceVideoUrl: "",
+          ratio: plan.ratio,
+          duration: plan.duration,
+          watermark: plan.watermark,
+          requestBody,
+          exampleTitle: sequenceTitle,
+          status: "submitting",
+          logs: [createLog],
+        });
+
+        let taskPayload: TaskResponse = {};
+        let taskHttpStatus = 0;
+        try {
+          const response = await fetch("/api/seedance/tasks", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({
+              ...connectionPayload(),
+              model: plan.model,
+              requestBody,
+            }),
+          });
+          taskHttpStatus = response.status;
+          taskPayload = (await response.json()) as TaskResponse;
+          if (!response.ok) {
+            throw new Error(taskPayload.error ?? "创建连续视频任务失败。");
+          }
+          if (!taskPayload.id) {
+            throw new Error("连续视频任务已提交，但响应中没有任务 ID。");
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "创建连续视频任务失败。";
+          patchHistory(attemptId, {
+            status: "failed",
+            error: message,
+            logs: [
+              {
+                ...createLog,
+                response: taskHttpStatus
+                  ? { httpStatus: taskHttpStatus, body: taskPayload! }
+                  : undefined,
+                error: taskHttpStatus ? undefined : message,
+              },
+            ],
+          });
+          patchSequenceStep(index, { status: "failed", error: message });
+          throw error;
+        }
+
+        const remoteTaskId = taskPayload.id;
+        let normalizedStatus = normalizeStatus(taskPayload.status);
+        patchHistory(attemptId, {
+          taskId: remoteTaskId,
+          status: normalizedStatus,
+          logs: [
+            {
+              ...createLog,
+              response: { httpStatus: taskHttpStatus, body: taskPayload },
+            },
+          ],
+        });
+        patchSequenceStep(index, {
+          status: normalizedStatus,
+          taskId: remoteTaskId,
+        });
+
+        let consecutiveStatusErrors = 0;
+        while (
+          normalizedStatus === "queued" ||
+          normalizedStatus === "running"
+        ) {
+          await wait(SEQUENCE_POLL_SECONDS * 1_000);
+          const statusRequest: TaskLogEntry["request"] = {
+            method: "GET",
+            url: `${baseUrl.replace(/\/$/, "")}/contents/generations/tasks/${encodeURIComponent(remoteTaskId)}`,
+            headers: {
+              authorization: `Bearer ${maskApiKey(apiKey)}`,
+              "content-type": "application/json",
+            },
+          };
+          let responseStatus = 0;
+          try {
+            const response = await fetch("/api/seedance/tasks/status", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              cache: "no-store",
+              body: JSON.stringify({
+                ...connectionPayload(),
+                model: plan.model,
+                taskId: remoteTaskId,
+              }),
+            });
+            responseStatus = response.status;
+            taskPayload = (await response.json()) as TaskResponse;
+            if (!response.ok) {
+              throw new Error(taskPayload.error ?? "查询连续视频任务失败。");
+            }
+            consecutiveStatusErrors = 0;
+            normalizedStatus = normalizeStatus(taskPayload.status);
+            appendHistoryLog(
+              attemptId,
+              {
+                at: new Date().toISOString(),
+                phase: "status",
+                request: statusRequest,
+                response: {
+                  httpStatus: response.status,
+                  body: taskPayload,
+                },
+              },
+              {
+                status: normalizedStatus,
+                resultVideoUrl: taskPayload.videoUrl,
+                resultLastFrameUrl: taskPayload.lastFrameUrl,
+                error: taskPayload.error,
+              },
+            );
+            patchSequenceStep(index, {
+              status: normalizedStatus,
+              videoUrl: taskPayload.videoUrl,
+              lastFrameUrl: taskPayload.lastFrameUrl,
+              error: taskPayload.error,
+            });
+          } catch (error) {
+            consecutiveStatusErrors += 1;
+            const message =
+              error instanceof Error ? error.message : "查询连续视频任务失败。";
+            appendHistoryLog(attemptId, {
+              at: new Date().toISOString(),
+              phase: "status",
+              request: statusRequest,
+              response: responseStatus
+                ? { httpStatus: responseStatus, body: taskPayload }
+                : undefined,
+              error: message,
+            });
+            if (consecutiveStatusErrors >= 3) {
+              patchHistory(attemptId, { status: "failed", error: message });
+              patchSequenceStep(index, { status: "failed", error: message });
+              throw error;
+            }
+          }
+        }
+
+        if (normalizedStatus === "failed") {
+          throw new Error(taskPayload.error ?? `第 ${index + 1} 段生成失败。`);
+        }
+        if (!taskPayload.videoUrl || !taskPayload.lastFrameUrl) {
+          const message = `第 ${index + 1} 段未同时返回视频和尾帧，无法继续串联。`;
+          patchHistory(attemptId, { error: message });
+          patchSequenceStep(index, { status: "failed", error: message });
+          throw new Error(message);
+        }
+
+        currentFrameUrl = taskPayload.lastFrameUrl;
+      }
+
+      setSequenceStatus("succeeded");
+      setSequenceConfirmed(false);
+      if (!rememberApiKey) {
+        setApiKey("");
+        setShowApiKey(false);
+      }
+    } catch (error) {
+      setSequenceStatus("failed");
+      setSequenceError(
+        error instanceof Error ? error.message : "连续视频生成失败。",
+      );
+    }
+  }
+
+  function updateMediaItem(index: number, patch: Partial<MediaEditorItem>) {
+    setMediaItems((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item,
+      ),
+    );
+    resetTaskResult();
+  }
+
+  function addMediaItem(type: SeedanceMediaType) {
+    const roles = {
+      image_url: "reference_image",
+      video_url: "reference_video",
+      audio_url: "reference_audio",
+    } as const;
+    setMediaItems((current) => [
+      ...current,
+      { type, url: "", role: roles[type] },
+    ]);
+    resetTaskResult();
   }
 
   return (
@@ -684,7 +1072,7 @@ export function SeedanceTaskRunner() {
         <div className="request-panel-heading">
           <div>
             <span className="config-kicker">TASK PAYLOAD</span>
-            <h3 id="request-heading">视频编辑请求</h3>
+            <h3 id="request-heading">{selectedExampleTitle}</h3>
           </div>
           <span className="request-mode">REAL API</span>
         </div>
@@ -703,35 +1091,103 @@ export function SeedanceTaskRunner() {
             />
           </label>
 
-          <label className="request-field request-field-wide">
-            <span>参考图片 URL</span>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(event) => {
-                setImageUrl(event.target.value);
-                resetTaskResult();
-              }}
-              disabled={active}
-              spellCheck={false}
-            />
-            <small>作为 reference_image，必须是公网可访问的 HTTPS URL。</small>
-          </label>
-
-          <label className="request-field request-field-wide">
-            <span>参考视频 URL</span>
-            <input
-              type="url"
-              value={videoUrl}
-              onChange={(event) => {
-                setVideoUrl(event.target.value);
-                resetTaskResult();
-              }}
-              disabled={active}
-              spellCheck={false}
-            />
-            <small>作为 reference_video，必须是公网可访问的 HTTPS URL。</small>
-          </label>
+          <div className="request-field request-field-wide">
+            <span>多模态素材</span>
+            <div className="media-editor-list">
+              {mediaItems.length === 0 ? (
+                <p>当前为纯文本输入，没有参考素材。</p>
+              ) : (
+                mediaItems.map((item, index) => (
+                  <div className="media-editor-row" key={`${item.type}-${index}`}>
+                    <select
+                      aria-label={`素材 ${index + 1} 类型`}
+                      value={item.type}
+                      onChange={(event) => {
+                        const type = event.target.value as SeedanceMediaType;
+                        const roles = {
+                          image_url: "reference_image",
+                          video_url: "reference_video",
+                          audio_url: "reference_audio",
+                        } as const;
+                        updateMediaItem(index, { type, role: roles[type] });
+                      }}
+                      disabled={active}
+                    >
+                      <option value="image_url">图片</option>
+                      <option value="video_url">视频</option>
+                      <option value="audio_url">音频</option>
+                    </select>
+                    <select
+                      aria-label={`素材 ${index + 1} 角色`}
+                      value={item.role ?? ""}
+                      onChange={(event) =>
+                        updateMediaItem(index, {
+                          role:
+                            (event.target.value ||
+                              undefined) as MediaEditorItem["role"],
+                        })
+                      }
+                      disabled={active || item.type !== "image_url"}
+                    >
+                      {item.type === "image_url" ? (
+                        <>
+                          <option value="">自动识别</option>
+                          <option value="reference_image">参考图</option>
+                          <option value="first_frame">首帧</option>
+                          <option value="last_frame">尾帧</option>
+                        </>
+                      ) : item.type === "video_url" ? (
+                        <option value="reference_video">参考视频</option>
+                      ) : (
+                        <option value="reference_audio">参考音频</option>
+                      )}
+                    </select>
+                    <input
+                      aria-label={`素材 ${index + 1} URL`}
+                      type="url"
+                      value={item.url}
+                      onChange={(event) =>
+                        updateMediaItem(index, { url: event.target.value })
+                      }
+                      disabled={active}
+                      spellCheck={false}
+                    />
+                    <button
+                      type="button"
+                      aria-label={`删除素材 ${index + 1}`}
+                      onClick={() => {
+                        setMediaItems((current) =>
+                          current.filter(
+                            (_, itemIndex) => itemIndex !== index,
+                          ),
+                        );
+                        resetTaskResult();
+                      }}
+                      disabled={active}
+                    >
+                      删除
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="media-editor-actions">
+              <button type="button" onClick={() => addMediaItem("image_url")} disabled={active}>
+                + 图片
+              </button>
+              <button type="button" onClick={() => addMediaItem("video_url")} disabled={active}>
+                + 视频
+              </button>
+              <button type="button" onClick={() => addMediaItem("audio_url")} disabled={active}>
+                + 音频
+              </button>
+            </div>
+            <small>
+              支持最多 9 张图片、3 段视频和 3 段音频；素材可使用公网 HTTPS URL，
+              图片还支持官方预置人像的 asset://asset-* ID。首尾帧模式必须各有一张
+              first_frame 与 last_frame。
+            </small>
+          </div>
 
           <label className="request-field">
             <span>宽高比</span>
@@ -771,20 +1227,48 @@ export function SeedanceTaskRunner() {
             </select>
           </label>
 
-          <label className="toggle-field">
-            <input
-              type="checkbox"
-              checked={generateAudio}
+          <label className="request-field">
+            <span>分辨率</span>
+            <select
+              value={resolution ?? ""}
               onChange={(event) => {
-                setGenerateAudio(event.target.checked);
+                setResolution(
+                  (event.target.value || undefined) as
+                    | SeedanceRequestBody["resolution"]
+                    | undefined,
+                );
                 resetTaskResult();
               }}
               disabled={active}
-            />
-            <span>
-              <strong>生成音频</strong>
-              <small>generate_audio: {String(generateAudio)}</small>
-            </span>
+            >
+              <option value="">模型默认</option>
+              <option value="480p">480p</option>
+              <option value="720p">720p</option>
+              <option value="1080p">1080p</option>
+              <option value="4k">4K</option>
+            </select>
+          </label>
+
+          <label className="request-field">
+            <span>生成音频</span>
+            <select
+              value={
+                generateAudio === undefined ? "" : String(generateAudio)
+              }
+              onChange={(event) => {
+                setGenerateAudio(
+                  event.target.value === ""
+                    ? undefined
+                    : event.target.value === "true",
+                );
+                resetTaskResult();
+              }}
+              disabled={active}
+            >
+              <option value="">不传参数</option>
+              <option value="true">是</option>
+              <option value="false">否</option>
+            </select>
           </label>
 
           <label className="toggle-field">
@@ -800,6 +1284,38 @@ export function SeedanceTaskRunner() {
             <span>
               <strong>添加水印</strong>
               <small>watermark: {String(watermark)}</small>
+            </span>
+          </label>
+
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={webSearch}
+              onChange={(event) => {
+                setWebSearch(event.target.checked);
+                resetTaskResult();
+              }}
+              disabled={active || mediaItems.length > 0}
+            />
+            <span>
+              <strong>联网搜索</strong>
+              <small>tools: web_search（仅纯文本）</small>
+            </span>
+          </label>
+
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={returnLastFrame}
+              onChange={(event) => {
+                setReturnLastFrame(event.target.checked);
+                resetTaskResult();
+              }}
+              disabled={active}
+            />
+            <span>
+              <strong>返回尾帧</strong>
+              <small>return_last_frame: {String(returnLastFrame)}</small>
             </span>
           </label>
         </div>
@@ -919,13 +1435,21 @@ export function SeedanceTaskRunner() {
           </div>
           <div>
             <dt>素材</dt>
-            <dd>1 张图片 + 1 段视频</dd>
+            <dd>{mediaSummary(mediaItems)}</dd>
           </div>
           <div>
             <dt>输出</dt>
             <dd>
-              {ratio} · {duration} 秒 · {generateAudio ? "有声" : "无声"} ·{" "}
-              {watermark ? "有水印" : "无水印"}
+              {ratio} · {duration} 秒
+              {resolution ? ` · ${resolution.toUpperCase()}` : ""} ·{" "}
+              {generateAudio === undefined
+                ? "音频由模型默认"
+                : generateAudio
+                  ? "有声"
+                  : "无声"}{" "}
+              · {watermark ? "有水印" : "无水印"}
+              {webSearch ? " · 联网搜索" : ""}
+              {returnLastFrame ? " · 返回尾帧" : ""}
             </dd>
           </div>
         </dl>
@@ -954,7 +1478,7 @@ export function SeedanceTaskRunner() {
               ? "正在创建任务…"
               : "执行真实视频生成任务"}
           </button>
-          {active && taskId && (
+          {singleTaskActive && taskId && (
             <button
               className="refresh-status-button"
               type="button"
@@ -1019,9 +1543,103 @@ export function SeedanceTaskRunner() {
             <a href={resultVideoUrl} target="_blank" rel="noreferrer">
               在新窗口打开结果视频 ↗
             </a>
+            {resultLastFrameUrl && (
+              <a href={resultLastFrameUrl} target="_blank" rel="noreferrer">
+                打开返回的尾帧图 ↗
+              </a>
+            )}
           </div>
         )}
       </section>
+
+      {selectedSequencePlan && (
+        <section
+          className="sequence-panel"
+          aria-labelledby="sequence-heading"
+        >
+          <div className="sequence-heading">
+            <div>
+              <span className="config-kicker">CONTINUOUS VIDEO CHAIN</span>
+              <h3 id="sequence-heading">生成多个连续视频</h3>
+            </div>
+            <span className={`task-status status-${sequenceStatus}`}>
+              {sequenceStatusLabel(sequenceStatus)}
+            </span>
+          </div>
+          <div className="sequence-intro">
+            <p>
+              按官方示例顺序生成 {selectedSequencePlan.prompts.length} 段视频。
+              每段都请求返回尾帧，并自动把该尾帧作为下一段的首帧。
+            </p>
+            <dl>
+              <div>
+                <dt>模型</dt>
+                <dd>{selectedSequencePlan.model}</dd>
+              </div>
+              <div>
+                <dt>单段输出</dt>
+                <dd>
+                  {selectedSequencePlan.ratio} ·{" "}
+                  {selectedSequencePlan.duration} 秒 · 返回尾帧
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <ol className="sequence-steps">
+            {sequenceSteps.map((step, index) => (
+              <li
+                className={`sequence-step sequence-step-${step.status}`}
+                key={`${index}-${step.prompt}`}
+              >
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <strong>{sequenceStepLabel(step.status)}</strong>
+                  <p>{step.prompt}</p>
+                  {step.taskId && <code>{step.taskId}</code>}
+                  {step.error && <small>{step.error}</small>}
+                  {step.videoUrl && (
+                    <a href={step.videoUrl} target="_blank" rel="noreferrer">
+                      打开第 {index + 1} 段视频 ↗
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+          {sequenceStatus !== "running" && (
+            <label className="cost-confirmation sequence-cost-confirmation">
+              <input
+                type="checkbox"
+                checked={sequenceConfirmed}
+                onChange={(event) =>
+                  setSequenceConfirmed(event.target.checked)
+                }
+              />
+              <span>
+                我确认连续生成会依次创建{" "}
+                {selectedSequencePlan.prompts.length} 个真实任务，并消耗对应额度或产生费用。
+              </span>
+            </label>
+          )}
+          <div className="execution-actions">
+            <button
+              className="execute-button"
+              type="button"
+              data-testid="run-continuous-sequence"
+              onClick={() => void runContinuousSequence()}
+              disabled={!sequenceReady}
+            >
+              {sequenceStatus === "running"
+                ? "正在连续生成…"
+                : `执行 ${selectedSequencePlan.prompts.length} 段连续视频`}
+            </button>
+            <span>
+              {sequenceError ||
+                "连续任务按顺序创建；前一段成功返回尾帧后，才会创建下一段。"}
+            </span>
+          </div>
+        </section>
+      )}
 
       <section className="history-panel" aria-labelledby="history-heading">
         <div className="history-heading">
@@ -1086,6 +1704,7 @@ export function SeedanceTaskRunner() {
                   {record.apiPath === "agent-plan" ? "Agent Plan" : "标准 API"} ·{" "}
                   {record.model} · {record.ratio} · {record.duration} 秒
                 </p>
+                {record.exampleTitle && <strong>{record.exampleTitle}</strong>}
                 {record.error && (
                   <p className="history-error">{record.error}</p>
                 )}
@@ -1096,6 +1715,15 @@ export function SeedanceTaskRunner() {
                     rel="noreferrer"
                   >
                     打开结果视频 ↗
+                  </a>
+                )}
+                {record.resultLastFrameUrl && (
+                  <a
+                    href={record.resultLastFrameUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    打开尾帧图 ↗
                   </a>
                 )}
               </li>
@@ -1176,47 +1804,57 @@ export function SeedanceTaskRunner() {
   );
 }
 
+type MediaEditorItem = {
+  type: SeedanceMediaType;
+  url: string;
+  role?:
+    | SeedanceImageRole
+    | "reference_video"
+    | "reference_audio";
+};
+
 type EditableApiParameters = {
   model: string;
   prompt: string;
-  imageUrl: string;
-  videoUrl: string;
+  mediaItems: MediaEditorItem[];
   ratio: (typeof RATIOS)[number];
   duration: number;
-  generateAudio: boolean;
+  generateAudio?: boolean;
   watermark: boolean;
+  resolution?: SeedanceRequestBody["resolution"];
+  webSearch: boolean;
+  returnLastFrame: boolean;
 };
 
-function buildUpstreamRequestBody(parameters: EditableApiParameters) {
-  return {
+function buildUpstreamRequestBody(
+  parameters: EditableApiParameters,
+): SeedanceRequestBody {
+  const body: SeedanceRequestBody = {
     model: parameters.model,
     content: [
       {
         type: "text",
         text: parameters.prompt,
       },
-      {
-        type: "image_url",
-        image_url: { url: parameters.imageUrl },
-        role: "reference_image",
-      },
-      {
-        type: "video_url",
-        video_url: { url: parameters.videoUrl },
-        role: "reference_video",
-      },
+      ...parameters.mediaItems.map(mediaEditorToContent),
     ],
-    generate_audio: parameters.generateAudio,
     ratio: parameters.ratio,
     duration: parameters.duration,
     watermark: parameters.watermark,
   };
+  if (parameters.generateAudio !== undefined) {
+    body.generate_audio = parameters.generateAudio;
+  }
+  if (parameters.resolution) body.resolution = parameters.resolution;
+  if (parameters.webSearch) body.tools = [{ type: "web_search" }];
+  if (parameters.returnLastFrame) body.return_last_frame = true;
+  return body;
 }
 
 function parseEditableApiBody(
   raw: string,
   apiPath: ApiPath,
-): EditableApiParameters {
+): SeedanceRequestBody {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -1235,17 +1873,11 @@ function parseEditableApiBody(
   const textItem = body.content.find(
     (item) => isRecord(item) && item.type === "text",
   );
-  const imageItem = body.content.find(
-    (item) => isRecord(item) && item.type === "image_url",
-  );
-  const videoItem = body.content.find(
-    (item) => isRecord(item) && item.type === "video_url",
-  );
-  if (!isRecord(textItem) || !isRecord(imageItem) || !isRecord(videoItem)) {
-    throw new Error("content 必须包含 text、image_url 和 video_url 三项。");
-  }
-  const imagePayload = objectValue(imageItem.image_url, "image_url");
-  const videoPayload = objectValue(videoItem.video_url, "video_url");
+  if (!isRecord(textItem)) throw new Error("content 必须包含一项 text。");
+  const prompt = stringValue(textItem.text, "content.text");
+  const mediaItems = body.content
+    .filter((item) => isRecord(item) && item.type !== "text")
+    .map(parseMediaContent);
   const ratio = stringValue(body.ratio, "ratio");
   if (!RATIOS.includes(ratio as (typeof RATIOS)[number])) {
     throw new Error("ratio 不在当前支持范围内。");
@@ -1259,22 +1891,159 @@ function parseEditableApiBody(
     throw new Error("duration 必须是 4–15 的整数。");
   }
   if (
-    typeof body.generate_audio !== "boolean" ||
-    typeof body.watermark !== "boolean"
+    body.generate_audio !== undefined &&
+    typeof body.generate_audio !== "boolean"
   ) {
-    throw new Error("generate_audio 和 watermark 必须是布尔值。");
+    throw new Error("generate_audio 必须是布尔值或省略。");
+  }
+  if (typeof body.watermark !== "boolean") {
+    throw new Error("watermark 必须是布尔值。");
+  }
+  if (
+    body.return_last_frame !== undefined &&
+    typeof body.return_last_frame !== "boolean"
+  ) {
+    throw new Error("return_last_frame 必须是布尔值或省略。");
+  }
+  if (
+    body.resolution !== undefined &&
+    !["480p", "720p", "1080p", "4k"].includes(String(body.resolution))
+  ) {
+    throw new Error("resolution 只支持 480p、720p、1080p 或 4k。");
+  }
+  const webSearch =
+    Array.isArray(body.tools) &&
+    body.tools.some(
+      (tool) => isRecord(tool) && tool.type === "web_search",
+    );
+  if (webSearch && mediaItems.length > 0) {
+    throw new Error("联网搜索仅适用于纯文本输入，请移除参考素材。");
   }
 
-  return {
+  return buildUpstreamRequestBody({
     model,
-    prompt: stringValue(textItem.text, "content.text"),
-    imageUrl: stringValue(imagePayload.url, "image_url.url"),
-    videoUrl: stringValue(videoPayload.url, "video_url.url"),
+    prompt,
+    mediaItems,
     ratio: ratio as (typeof RATIOS)[number],
     duration: body.duration,
-    generateAudio: body.generate_audio,
+    generateAudio: body.generate_audio as boolean | undefined,
     watermark: body.watermark,
+    resolution: body.resolution as SeedanceRequestBody["resolution"],
+    webSearch,
+    returnLastFrame: body.return_last_frame === true,
+  });
+}
+
+function parseMediaContent(value: unknown): MediaEditorItem {
+  const item = objectValue(value, "content 素材");
+  const type = stringValue(item.type, "content.type") as SeedanceMediaType;
+  if (
+    type !== "image_url" &&
+    type !== "video_url" &&
+    type !== "audio_url"
+  ) {
+    throw new Error("素材 type 只支持 image_url、video_url 或 audio_url。");
+  }
+  const payloadName = type;
+  const payload = objectValue(item[payloadName], payloadName);
+  const role = item.role as MediaEditorItem["role"];
+  if (type === "image_url") {
+    if (
+      role !== undefined &&
+      role !== "reference_image" &&
+      role !== "first_frame" &&
+      role !== "last_frame"
+    ) {
+      throw new Error(
+        "image_url.role 只支持 reference_image、first_frame、last_frame 或省略。",
+      );
+    }
+  } else {
+    const requiredRole =
+      type === "video_url" ? "reference_video" : "reference_audio";
+    if (role !== requiredRole) {
+      throw new Error(`${type}.role 必须是 ${requiredRole}。`);
+    }
+  }
+  return {
+    type,
+    url: stringValue(payload.url, `${payloadName}.url`),
+    role,
   };
+}
+
+function mediaEditorToContent(item: MediaEditorItem): SeedanceContentItem {
+  if (item.type === "image_url") {
+    const content: SeedanceContentItem = {
+      type: "image_url",
+      image_url: { url: item.url },
+    };
+    if (
+      item.role === "reference_image" ||
+      item.role === "first_frame" ||
+      item.role === "last_frame"
+    ) {
+      content.role = item.role;
+    }
+    return content;
+  }
+  if (item.type === "video_url") {
+    return {
+      type: "video_url",
+      video_url: { url: item.url },
+      role: "reference_video",
+    };
+  }
+  return {
+    type: "audio_url",
+    audio_url: { url: item.url },
+    role: "reference_audio",
+  };
+}
+
+function getPrompt(body: SeedanceRequestBody): string {
+  const textItem = body.content.find((item) => item.type === "text");
+  return textItem?.type === "text" ? textItem.text : "";
+}
+
+function getMediaItems(body: SeedanceRequestBody): MediaEditorItem[] {
+  return body.content
+    .filter((item) => item.type !== "text")
+    .map(parseMediaContent);
+}
+
+function mediaSummary(items: MediaEditorItem[]): string {
+  const counts = {
+    image_url: 0,
+    video_url: 0,
+    audio_url: 0,
+  };
+  items.forEach((item) => {
+    counts[item.type] += 1;
+  });
+  const parts = [
+    counts.image_url ? `${counts.image_url} 张图片` : "",
+    counts.video_url ? `${counts.video_url} 段视频` : "",
+    counts.audio_url ? `${counts.audio_url} 段音频` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" + ") : "纯文本";
+}
+
+function mediaRolesValid(items: MediaEditorItem[]): boolean {
+  const imageItems = items.filter((item) => item.type === "image_url");
+  const firstFrames = imageItems.filter(
+    (item) => item.role === "first_frame",
+  ).length;
+  const lastFrames = imageItems.filter(
+    (item) => item.role === "last_frame",
+  ).length;
+  if (firstFrames === 0 && lastFrames === 0) return true;
+  return (
+    firstFrames === 1 &&
+    lastFrames === 1 &&
+    imageItems.length === 2 &&
+    items.every((item) => item.type === "image_url")
+  );
 }
 
 function objectValue(
@@ -1330,6 +2099,34 @@ function statusLabel(status: HistoryRecord["status"]): string {
     failed: "失败",
   };
   return labels[status];
+}
+
+function sequenceStatusLabel(
+  status: "idle" | "running" | "succeeded" | "failed",
+): string {
+  const labels = {
+    idle: "待执行",
+    running: "连续生成中",
+    succeeded: "全部完成",
+    failed: "链路中断",
+  };
+  return labels[status];
+}
+
+function sequenceStepLabel(status: SequenceStep["status"]): string {
+  const labels: Record<SequenceStep["status"], string> = {
+    pending: "等待上一段",
+    submitting: "正在创建",
+    queued: "已排队",
+    running: "生成中",
+    succeeded: "已完成",
+    failed: "生成失败",
+  };
+  return labels[status];
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 function readHistory(): HistoryRecord[] {
@@ -1390,7 +2187,8 @@ function isHistoryRecord(value: unknown): value is HistoryRecord {
     typeof record.referenceVideoUrl === "string" &&
     RATIOS.includes(record.ratio as (typeof RATIOS)[number]) &&
     typeof record.duration === "number" &&
-    typeof record.generateAudio === "boolean" &&
+    (record.generateAudio === undefined ||
+      typeof record.generateAudio === "boolean") &&
     typeof record.watermark === "boolean" &&
     (record.status === "queued" ||
       record.status === "submitting" ||
