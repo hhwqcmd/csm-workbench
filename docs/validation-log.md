@@ -46,6 +46,18 @@
 - 两条任务刷新后仍保留结果和完整请求/状态日志。
 - “素材待补”模板预填空素材位后，真实执行按钮保持禁用。
 
+## 2026-07-28：Managed Agents 四步快速入门
+
+- 使用当前项目保存的标准官方 API Key 与 `/api/v3` 完成真实验收。
+- `doubao-seed-2-1-pro-260628`、`agent_toolset_20260701`、`cloud` +
+  `unrestricted` 均被上游接受。
+- 创建 Agent、创建环境、开启 Session 均成功返回资源 ID，页面按顺序自动联动。
+- `user.message` 提交成功，SSE 共收到 15 个事件；包含工具调用、工具结果和
+  `session.status_idle`。
+- Agent 在托管沙箱中生成 Python 脚本和 `fibonacci.txt`，最终文本响应成功返回。
+- 修复了收到 `session.status_idle` 后仍等待长连接关闭的问题；现在主动结束读取并将本轮标记为成功。
+- 刷新页面后 1 条 Managed Agents 历史及 5 类请求/响应日志仍可恢复；Authorization 只保留掩码。
+
 ## 记录新验收时
 
 只记录：

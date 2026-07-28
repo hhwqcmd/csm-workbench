@@ -18,6 +18,14 @@ run_demo.sh
   → app/lib/seedance-server.ts
   → 标准 API 或 Agent Plan 白名单 Base URL
   → Content Generation Tasks API
+
+Managed Agents 路径
+浏览器
+  → ManagedAgentsWorkbench
+  → POST /api/managed-agents/{agents|environments|sessions|messages}
+  → app/lib/managed-agents-server.ts
+  → 标准 API 白名单 Base URL
+  → Managed Agents 资源 API 与 SSE 事件流
 ```
 
 官方路径用于回答“API 是否按教程跑通”；产品路径用于回答“如何安全、清楚地向别人演示”。
@@ -38,12 +46,13 @@ run_demo.sh
 当前服务端模块负责：
 
 1. 接收浏览器本次手工输入的 Key，但不在服务端持久化、记录或回显。
-2. 将 API 路径限制为标准 API 与 Agent Plan 两个精确 Base URL。
+2. Seedance 将 API 路径限制为标准 API 与 Agent Plan 两个精确 Base URL；Managed Agents 只允许标准 `/api/v3`。
 3. 校验模型属于对应路径；Agent Plan 使用套餐别名，标准 API 使用日期版本 Model ID。
 4. 校验通用 `content` 多模态数组、素材 URL、时长、比例、4K 模型限制与联网搜索纯文本限制。
 5. 创建任务并只向浏览器返回必要的任务 ID。
 6. 查询并归一化任务状态。
 7. 对错误进行安全脱敏，避免返回 Secret 或内部日志。
+8. Managed Agents 逐步校验 Agent、环境、会话与消息结构；消息路由先提交事件，再把上游 SSE 流转发给浏览器。
 
 浏览器负责收集参数、管理本机演示凭证、生成完整 API 预览、保存任务历史与脱敏日志、展示状态和播放结果。
 
@@ -58,10 +67,11 @@ run_demo.sh
 - 每次点击提交先创建本地记录，再发起请求；创建失败但未取得远端任务 ID 的尝试仍可在历史中查看。
 - 日志保存创建请求和后续状态查询的请求/响应。Authorization 只保存掩码，服务端仍不记录 Key。
 - 八个官方示例集中定义在 `app/lib/seedance-examples.ts`；示例卡片通过显式事件把整份 Request Body 和可选连续生成计划交给实操台，避免页面展示值与实际请求分叉。连续生成是独立的任务八，不再依附任务七。
-- `WorkspaceShell` 管理“演示工作台 / 模板资产库”两个平级视图；两者始终复用同一个 `SeedanceTaskRunner`，不得在模板页复制凭证、任务、历史或日志状态。
+- `WorkspaceShell` 管理“演示工作台 / 模板资产库 / Managed Agents”三个平级视图；前两者复用同一个 `SeedanceTaskRunner`，Managed Agents 使用独立执行器但复用标准官方 API 凭证。
 - 模板预填统一通过 `seedance:apply-example` 事件进入任务执行器；影视和营销模板允许用空 URL 表达缺失素材，执行器既有的 `requestReady` 校验会在补齐前阻止真实提交。
 - 四类模板集中定义在 `app/lib/template-assets.ts`。提示词公式只提供复制；电商、影视和营销场景模板通过相同 `seedance:apply-example` 事件把整份 Request Body 交给实操台，缺失素材用空 URL 表达。
 - 连续视频链路仍复用同一创建/查询 API；每段的 `last_frame_url` 只在上一段成功后作为下一段输入，不引入新的服务端代理入口。
+- Managed Agents 最近 20 轮单独保存在当前浏览器；每轮记录三个资源 ID、四个步骤状态与五类日志。收到 `session.status_idle` 后页面主动结束 SSE 读取。
 
 ## 状态模型
 
@@ -80,6 +90,7 @@ run_demo.sh
 - Agent Plan Key、普通方舟 Key、Coding Plan Key 是不同凭证；选择的 API 路径必须与对应 Key 匹配。
 - Agent Plan API 地址必须包含 `/plan`。创建任务完整地址为 `https://ark.cn-beijing.volces.com/api/plan/v3/contents/generations/tasks`，查询地址在其后追加 `/{id}`。
 - 标准 API 完整创建地址为 `https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks`。
+- Managed Agents 资源与事件 API 固定在标准 `/api/v3`；Agent Plan 地址不开放给该模块。
 - 真实“创建任务”是外部写操作且可能产生费用，不与页面加载或普通测试绑定。
 - 用户素材可能包含隐私或商业信息；上传/托管策略在引入前单独决策。
 - 官方教程可能更新模型 ID、限流、输入数量和价格。执行真实任务前重新核对权威文档。

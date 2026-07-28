@@ -5,14 +5,17 @@ import {
   WORKSPACE_NAVIGATE_EVENT,
   type WorkspaceView,
 } from "../lib/workspace-navigation";
+import { ManagedAgentsWorkbench } from "./ManagedAgentsWorkbench";
 import { SeedanceExampleGallery } from "./SeedanceExampleGallery";
 import { SeedanceTaskRunner } from "./SeedanceTaskRunner";
 import { TemplateAssetLibrary } from "./TemplateAssetLibrary";
 
 function viewFromHash(): WorkspaceView {
-  return window.location.hash.startsWith("#templates")
-    ? "templates"
-    : "workbench";
+  if (window.location.hash.startsWith("#templates")) return "templates";
+  if (window.location.hash.startsWith("#managed-agents")) {
+    return "managed-agents";
+  }
+  return "workbench";
 }
 
 export function WorkspaceShell() {
@@ -25,13 +28,30 @@ export function WorkspaceShell() {
 
     function handleNavigate(event: Event) {
       const nextView = (event as CustomEvent<WorkspaceView>).detail;
-      if (nextView !== "workbench" && nextView !== "templates") return;
+      if (
+        nextView !== "workbench" &&
+        nextView !== "templates" &&
+        nextView !== "managed-agents"
+      ) {
+        return;
+      }
       setView(nextView);
-      const nextHash = nextView === "templates" ? "#templates" : "#operations";
+      const nextHash =
+        nextView === "templates"
+          ? "#templates"
+          : nextView === "managed-agents"
+            ? "#managed-agents"
+            : "#operations";
       window.history.replaceState(null, "", nextHash);
       window.setTimeout(() => {
         document
-          .getElementById(nextView === "templates" ? "templates" : "operations")
+          .getElementById(
+            nextView === "templates"
+              ? "templates"
+              : nextView === "managed-agents"
+                ? "managed-agents"
+                : "operations",
+          )
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 0);
     }
@@ -47,7 +67,12 @@ export function WorkspaceShell() {
 
   function selectView(nextView: WorkspaceView) {
     setView(nextView);
-    const nextHash = nextView === "templates" ? "#templates" : "#top";
+    const nextHash =
+      nextView === "templates"
+        ? "#templates"
+        : nextView === "managed-agents"
+          ? "#managed-agents"
+          : "#top";
     window.history.replaceState(null, "", nextHash);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -61,10 +86,10 @@ export function WorkspaceShell() {
           type="button"
           aria-label="返回演示工作台顶部"
         >
-          <span className="brand-mark">S2</span>
+          <span className="brand-mark">ARK</span>
           <span>
-            <strong>Seedance 2.0</strong>
-            <small>视频生成演示与模板资产</small>
+            <strong>火山方舟 Demo Studio</strong>
+            <small>视频生成 · 模板资产 · Managed Agents</small>
           </span>
         </button>
 
@@ -87,6 +112,15 @@ export function WorkspaceShell() {
           >
             模板资产库
           </button>
+          <button
+            aria-current={view === "managed-agents" ? "page" : undefined}
+            className={view === "managed-agents" ? "is-active" : ""}
+            data-testid="workspace-managed-agents"
+            onClick={() => selectView("managed-agents")}
+            type="button"
+          >
+            Managed Agents
+          </button>
         </nav>
 
         <div className="topbar-actions">
@@ -103,7 +137,11 @@ export function WorkspaceShell() {
           )}
           <a
             className="doc-link"
-            href="https://docs.volcengine.com/docs/82379/2291680?lang=zh"
+            href={
+              view === "managed-agents"
+                ? "https://docs.volcengine.com/docs/82379/2553714?lang=zh"
+                : "https://docs.volcengine.com/docs/82379/2291680?lang=zh"
+            }
             target="_blank"
             rel="noreferrer"
           >
@@ -205,9 +243,19 @@ export function WorkspaceShell() {
         <TemplateAssetLibrary />
       </div>
 
+      <div
+        className="workspace-view"
+        data-active={view === "managed-agents"}
+        hidden={view !== "managed-agents"}
+      >
+        <ManagedAgentsWorkbench />
+      </div>
+
       <footer>
-        <p>Seedance 2.0 视频生成演示与模板资产库</p>
-        <span>官方 API / Agent Plan · 完整请求审核 · 历史与日志</span>
+        <p>火山方舟 API 演示与模板资产平台</p>
+        <span>
+          Seedance · Managed Agents · 完整请求审核 · 历史与脱敏日志
+        </span>
       </footer>
     </main>
   );

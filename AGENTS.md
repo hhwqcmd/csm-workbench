@@ -2,10 +2,11 @@
 
 ## 当前项目定位
 
-本项目是 Seedance 2.0 视频生成演示与模板资产平台，包含两个平级顶层栏目：
+本项目是火山方舟 API 演示与模板资产平台，包含三个平级顶层栏目：
 
 1. **演示工作台**：配置官方 API 或 Agent Plan、审核完整请求、创建异步任务，并查看结果、历史和请求/响应日志。
 2. **模板资产库**：浏览提示词、电商宣发、影视短剧和营销短视频模板，并将场景参数预填到同一个实操台。
+3. **Managed Agents**：创建 Agent、创建环境、开启会话，并发送消息与流式接收托管 Agent 响应。
 
 官方 Python 快速示例作为协议和素材基线独立保留，不是产品页面主线。页面不得重新加入共学进度、环境安装步骤或教程路线。
 
@@ -20,6 +21,9 @@
 
 - `app/page.tsx` → `app/components/WorkspaceShell.tsx`：页面入口、顶级栏目和整体组合。
 - `app/components/SeedanceTaskRunner.tsx`：连接、参数、完整 API 编辑、费用确认、创建、轮询、历史和日志。
+- `app/components/ManagedAgentsWorkbench.tsx`：Managed Agents 四步表单、完整 API 双向编辑、资源 ID 联动、SSE 输出、历史与日志。
+- `app/lib/managed-agents-server.ts`：Managed Agents 标准 Base URL、四类请求校验、资源创建与 SSE 转发。
+- `app/api/managed-agents/`：Agent、环境、会话与消息事件流的同源路由。
 - `app/lib/seedance-config.ts`：两条 API 路径、模型清单、默认模型和比例。
 - `app/lib/seedance-server.ts`：服务端白名单校验、上游请求、响应归一化和错误脱敏。
 - `app/api/seedance/tasks/route.ts`、`status/route.ts`：创建与查询的同源服务端入口。
@@ -36,6 +40,8 @@
 
 `示例/模板 → SeedanceTaskRunner → 同源 API 路由 → seedance-server → 火山方舟 API`
 
+`ManagedAgentsWorkbench → /api/managed-agents/* → managed-agents-server → 火山方舟 Managed Agents API`
+
 `official-quickstart → volcenginesdkarkruntime → 火山方舟 API`
 
 `app/` 不得导入 Python 示例；二者只共享协议认知和公开素材。
@@ -47,6 +53,7 @@
 - 真实 API 验证记录：`docs/validation-log.md`
 - Python 环境与重建：`docs/environment.md`
 - 创建、轮询、历史和日志：`docs/task-runner.md`
+- Managed Agents 四步协议、编辑联动、SSE 与日志：`docs/managed-agents.md`
 - 八个官方示例与模型限制：`docs/official-examples.md`
 - 四类模板与素材待补规则：`docs/template-library.md`
 - 官方资料入口：`docs/README.md`
@@ -67,6 +74,10 @@
 - 普通素材仅允许公网 HTTPS；预置虚拟人像只额外允许严格的 `asset://asset-*`。
 - 4K 只使用完整模型；联网搜索只允许纯文本；首尾帧必须保留 `first_frame` / `last_frame` 角色。
 - 连续视频必须串行，并在取得上一段 `last_frame_url` 后才能创建下一段。
+- Managed Agents 只使用标准 `https://ark.cn-beijing.volces.com/api/v3` 与普通方舟 Key，不支持 Agent Plan Base URL。
+- Managed Agents 默认模型和工具集以当前官方快速入门为准；创建响应的 Agent / Environment / Session ID 必须逐步联动，不得使用伪造占位 ID 发起下一步。
+- 消息步骤必须先 POST `user.message`，再连接 `/events/stream`；收到 `session.status_idle` 时主动结束本地读取，不能等待服务器无限保持连接。
+- Managed Agents 环境名在当前 project 内唯一；默认值必须避免重复，页面加载本身不得创建资源。
 - 模板缺少素材时用空 URL 表达并显示“素材待补”；所有 URL 补齐前执行按钮必须禁用。
 
 ## 地雷与遗留区域

@@ -14,9 +14,9 @@
 ## D002：所有真实调用经过同源服务端适配
 
 - **状态**：有效
-- **决定**：浏览器只调用 `/api/seedance/tasks` 和 `/status`，由 `seedance-server` 校验并转发。
+- **决定**：Seedance 浏览器只调用 `/api/seedance/tasks` 和 `/status`；Managed Agents 只调用 `/api/managed-agents/*`。各自服务端模块校验并转发。
 - **原因**：避免浏览器直连上游造成 Key 暴露，同时集中执行 Base URL、模型、素材和能力限制。
-- **约束**：服务端不是通用代理；只允许标准 API 与 Agent Plan 两个精确地址。
+- **约束**：服务端不是通用代理；Seedance 只允许标准 API 与 Agent Plan 两个精确地址，Managed Agents 只允许标准 API。
 
 ## D003：同时支持标准 API 与 Agent Plan
 
@@ -67,3 +67,16 @@
 - **原因**：降低演示访问门槛；凭证仍由每位访问者在自己的浏览器输入和保存。
 - **约束**：`app/chatgpt-auth.ts` 维持未使用遗留状态；重新启用认证必须作为独立架构变更评估。
 
+## D010：Managed Agents 作为独立顶级工作台
+
+- **状态**：有效，2026-07-28 生效
+- **决定**：Managed Agents 与演示工作台、模板资产库并列，内部使用四步顺序工作流和独立本机历史。
+- **原因**：Managed Agents 是资源创建与 SSE 会话协议，不应挤入视频异步任务表单；独立页面更适合完整讲解。
+- **约束**：标准官方 Key 与 Seedance 共用，但请求状态、资源 ID 和历史不混入视频任务记录。
+
+## D011：Managed Agents 消息由同源路由组合 POST 与 SSE
+
+- **状态**：有效
+- **决定**：浏览器向同源消息路由发一次 POST；服务端先向上游提交 `user.message`，再连接 `/events/stream` 并转发响应体。
+- **原因**：保持 Key 不在浏览器直连上游，同时复刻官方“先发送、后监听”的协议顺序。
+- **约束**：收到 `session.status_idle` 后客户端主动结束读取；日志分别记录发送请求与事件流结果。

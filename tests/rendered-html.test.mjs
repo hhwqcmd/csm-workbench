@@ -28,16 +28,20 @@ async function request(path = "/", init) {
   );
 }
 
-test("server-renders the Seedance demonstration workbench", async () => {
+test("server-renders the Ark demonstration platform", async () => {
   const response = await request();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /Seedance 2\.0 视频生成演示与模板资产库/);
-  assert.match(html, /property="og:image" content="http:\/\/localhost:3001\/og\.png"/);
+  assert.match(html, /火山方舟 API 演示与模板资产平台/);
+  assert.match(
+    html,
+    /property="og:image" content="http:\/\/localhost:3001\/og-platform\.png"/,
+  );
   assert.match(html, /演示工作台/);
   assert.match(html, /模板资产库/);
+  assert.match(html, /Managed Agents/);
   assert.match(html, /顶级栏目/);
   assert.match(html, /SEEDANCE API DEMO CONSOLE/);
   assert.doesNotMatch(html, /共学|STEP 03|当前检测结果|环境就绪|共学路线/);
@@ -84,6 +88,26 @@ test("server-renders the Seedance demonstration workbench", async () => {
   assert.match(html, /暂无历史任务/);
   assert.doesNotMatch(html, /codex-preview/);
   assert.doesNotMatch(html, /react-loading-skeleton/);
+});
+
+test("server-renders the editable Managed Agents four-step workbench", async () => {
+  const response = await request();
+  const html = await response.text();
+
+  assert.match(html, /四步搭好一个/);
+  assert.match(html, /创建 Agent/);
+  assert.match(html, /创建环境/);
+  assert.match(html, /开启会话/);
+  assert.match(html, /发送消息并流式传输响应/);
+  assert.match(html, /doubao-seed-2-1-pro-260628/);
+  assert.match(html, /agent_toolset_20260701/);
+  assert.match(html, /\/api\/v3\/agents/);
+  assert.match(html, /\/api\/v3\/environments/);
+  assert.match(html, /\/api\/v3\/sessions/);
+  assert.match(html, /events\/stream/);
+  assert.match(html, /表单 ↔ JSON 双向联动/);
+  assert.match(html, /暂无 Managed Agents 演示记录/);
+  assert.equal((html.match(/data-testid="managed-action-/g) ?? []).length, 4);
 });
 
 test("server-renders the four-category template asset library", async () => {
@@ -454,6 +478,187 @@ test("preserves first/last frame roles and validates continuous-video requests",
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("creates Managed Agents resources through the strict standard API proxy", async () => {
+  const originalFetch = globalThis.fetch;
+  const apiKey = "test-managed-agents-key-not-real";
+  const upstreamRequests = [];
+
+  globalThis.fetch = async (input, init) => {
+    upstreamRequests.push({ input: String(input), init });
+    return Response.json({
+      id: `managed-resource-${upstreamRequests.length}`,
+      object: "managed_agent_resource",
+    });
+  };
+
+  try {
+    const cases = [
+      {
+        localPath: "/api/managed-agents/agents",
+        upstreamPath: "/agents",
+        requestBody: {
+          name: "Quick Start Agent",
+          model: { id: "doubao-seed-2-1-pro-260628" },
+          system: "你是一个高效的编程助手。",
+          tools: [{ type: "agent_toolset_20260701" }],
+        },
+      },
+      {
+        localPath: "/api/managed-agents/environments",
+        upstreamPath: "/environments",
+        requestBody: {
+          name: "demo-env-test",
+          config: {
+            type: "cloud",
+            networking: { type: "unrestricted" },
+          },
+        },
+      },
+      {
+        localPath: "/api/managed-agents/sessions",
+        upstreamPath: "/sessions",
+        requestBody: {
+          agent: "agent-test-123",
+          environment_id: "env-test-123",
+          title: "Quickstart session",
+        },
+      },
+    ];
+
+    for (const item of cases) {
+      const response = await request(item.localPath, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+          apiKey,
+          requestBody: item.requestBody,
+        }),
+      });
+      const body = await response.text();
+      assert.equal(response.status, 201);
+      assert.doesNotMatch(body, new RegExp(apiKey));
+      const upstream = upstreamRequests.at(-1);
+      assert.equal(
+        upstream.input,
+        `https://ark.cn-beijing.volces.com/api/v3${item.upstreamPath}`,
+      );
+      assert.equal(upstream.init.method, "POST");
+      assert.equal(upstream.init.headers.authorization, `Bearer ${apiKey}`);
+      assert.deepEqual(JSON.parse(upstream.init.body), item.requestBody);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("sends a Managed Agents message before relaying the SSE event stream", async () => {
+  const originalFetch = globalThis.fetch;
+  const apiKey = "test-managed-agents-key-not-real";
+  const upstreamRequests = [];
+  const messageBody = {
+    events: [
+      {
+        type: "user.message",
+        content: [{ type: "text", text: "生成 fibonacci.txt" }],
+      },
+    ],
+  };
+
+  globalThis.fetch = async (input, init) => {
+    upstreamRequests.push({ input: String(input), init });
+    if (upstreamRequests.length === 1) {
+      return Response.json({ accepted: true }, { status: 202 });
+    }
+    return new Response(
+      [
+        'data: {"type":"agent.tool_use","name":"write"}',
+        "",
+        'data: {"type":"agent.message","content":[{"type":"text","text":"已完成"}]}',
+        "",
+        'data: {"type":"session.status_idle"}',
+        "",
+      ].join("\n"),
+      {
+        headers: { "content-type": "text/event-stream" },
+      },
+    );
+  };
+
+  try {
+    const response = await request("/api/managed-agents/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+        apiKey,
+        sessionId: "session-test-123",
+        requestBody: messageBody,
+      }),
+    });
+    const body = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /text\/event-stream/);
+    assert.match(body, /agent\.tool_use/);
+    assert.match(body, /session\.status_idle/);
+    assert.doesNotMatch(body, new RegExp(apiKey));
+    assert.equal(upstreamRequests.length, 2);
+    assert.equal(
+      upstreamRequests[0].input,
+      "https://ark.cn-beijing.volces.com/api/v3/sessions/session-test-123/events",
+    );
+    assert.equal(upstreamRequests[0].init.method, "POST");
+    assert.deepEqual(JSON.parse(upstreamRequests[0].init.body), messageBody);
+    assert.equal(
+      upstreamRequests[1].input,
+      "https://ark.cn-beijing.volces.com/api/v3/sessions/session-test-123/events/stream",
+    );
+    assert.equal(upstreamRequests[1].init.method, "GET");
+    assert.equal(upstreamRequests[1].init.headers.accept, "text/event-stream");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("rejects non-official Managed Agents Base URLs and unsupported payload fields", async () => {
+  const invalidBase = await request("/api/managed-agents/agents", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      baseUrl: "https://example.com/api/v3",
+      apiKey: "test-key",
+      requestBody: {
+        name: "Agent",
+        model: { id: "model-id" },
+        system: "System",
+        tools: [{ type: "agent_toolset_20260701" }],
+      },
+    }),
+  });
+  assert.equal(invalidBase.status, 400);
+  assert.match(await invalidBase.text(), /必须使用/);
+
+  const unsupportedField = await request("/api/managed-agents/environments", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+      apiKey: "test-key",
+      requestBody: {
+        name: "demo-env",
+        config: {
+          type: "cloud",
+          networking: { type: "unrestricted" },
+        },
+        redirect_url: "https://example.com",
+      },
+    }),
+  });
+  assert.equal(unsupportedField.status, 400);
+  assert.match(await unsupportedField.text(), /未开放转发/);
 });
 
 function validTaskInput() {

@@ -1,4 +1,4 @@
-export type WorkspaceView = "workbench" | "templates";
+export type WorkspaceView = "workbench" | "templates" | "managed-agents";
 
 export const WORKSPACE_NAVIGATE_EVENT = "seedance:navigate-workspace";
 

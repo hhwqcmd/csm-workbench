@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const title = "Seedance 2.0 视频生成演示与模板资产库";
+const title = "火山方舟 API 演示与模板资产平台";
 const description =
-  "从官方提示词与行业模板一键进入 Seedance 视频生成实操台，审核完整 API 请求并追踪任务、结果与请求响应日志。";
+  "在同一演示平台体验 Seedance 视频生成、行业模板资产与 Managed Agents 四步工作流，审核完整 API 并追踪结果与请求响应日志。";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol =
     requestHeaders.get("x-forwarded-proto") ??
     (host.startsWith("localhost") ? "http" : "https");
-  const socialImage = `${protocol}://${host}/og.png`;
+  const socialImage = `${protocol}://${host}/og-platform.png`;
 
   return {
     title: {
