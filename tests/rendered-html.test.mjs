@@ -34,9 +34,11 @@ test("server-renders the Seedance demonstration workbench", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /Seedance 2\.0 视频生成演示工作台/);
+  assert.match(html, /Seedance 2\.0 视频生成演示与模板资产库/);
   assert.match(html, /property="og:image" content="http:\/\/localhost:3001\/og\.png"/);
-  assert.match(html, /视频生成演示工作台/);
+  assert.match(html, /演示工作台/);
+  assert.match(html, /模板资产库/);
+  assert.match(html, /顶级栏目/);
   assert.match(html, /SEEDANCE API DEMO CONSOLE/);
   assert.doesNotMatch(html, /共学|STEP 03|当前检测结果|环境就绪|共学路线/);
   assert.match(html, /将视频1礼盒中的香水替换成图片1中的面霜/);
@@ -48,10 +50,11 @@ test("server-renders the Seedance demonstration workbench", async () => {
     "官方示例任务五：使用联网搜索",
     "官方示例任务六：使用预置虚拟人像",
     "官方示例任务七：图生视频-基于首尾帧（含音频）",
+    "官方示例任务八：生成多个连续视频",
   ]) {
     assert.match(html, new RegExp(title));
   }
-  assert.equal((html.match(/填入参数/g) ?? []).length, 8);
+  assert.equal((html.match(/填入参数/g) ?? []).length, 9);
   assert.ok(
     html.indexOf('id="sample"') < html.indexOf('id="operations"'),
     "the official sample should appear before the operations console",
@@ -81,6 +84,57 @@ test("server-renders the Seedance demonstration workbench", async () => {
   assert.match(html, /暂无历史任务/);
   assert.doesNotMatch(html, /codex-preview/);
   assert.doesNotMatch(html, /react-loading-skeleton/);
+});
+
+test("server-renders the four-category template asset library", async () => {
+  const response = await request();
+  const html = await response.text();
+
+  for (const category of [
+    "提示词模板",
+    "电商宣发视频模板",
+    "影视短剧模板",
+    "营销短视频模板",
+  ]) {
+    assert.match(html, new RegExp(category));
+  }
+  for (const title of [
+    "多模态参考基础公式",
+    "视频元素增删改",
+    "云朵面霜 · 三幕质感种草",
+    "冰爽果茶 · 夏日转化广告",
+    "武侠双人对决",
+    "品牌 Slogan 收尾",
+  ]) {
+    assert.match(html, new RegExp(title));
+  }
+
+  assert.equal((html.match(/复制提示词/g) ?? []).length, 16);
+  assert.equal((html.match(/data-testid="apply-template-/g) ?? []).length, 2);
+  assert.match(html, /doubao-seedance-2-0-mini-260615/);
+  assert.match(html, /9:16/);
+  assert.match(html, /8 秒/);
+  assert.match(html, /工作台预置案例/);
+  assert.match(html, /火山方舟提示词指南/);
+});
+
+test("keeps template application on the existing task runner path", async () => {
+  const librarySource = await readFile(
+    new URL("../app/components/TemplateAssetLibrary.tsx", import.meta.url),
+    "utf8",
+  );
+  const assetSource = await readFile(
+    new URL("../app/lib/template-assets.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(librarySource, /APPLY_EXAMPLE_EVENT/);
+  assert.match(librarySource, /navigateWorkspace\("workbench"\)/);
+  assert.doesNotMatch(librarySource, /fetch\(/);
+  assert.equal((assetSource.match(/runnableExample:/g) ?? []).length, 2);
+  assert.match(assetSource, /template-commerce-cloud-cream/);
+  assert.match(assetSource, /template-commerce-iced-tea/);
+  assert.doesNotMatch(assetSource, /ark-[a-z0-9-]{20,}/i);
 });
 
 test("does not embed an API key in server HTML or the example environment", async () => {
@@ -136,6 +190,10 @@ test("keeps the official example section legible on dark and light surfaces", as
     /\.example-card h3,[^}]*\{[^}]*color: #121612/s,
   );
   assert.match(styles, /grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
+  assert.match(
+    styles,
+    /\.example-card:nth-child\(7\),\s*\.example-card:nth-child\(8\)\s*\{[^}]*grid-column: span 3/s,
+  );
 });
 
 test("lists every current standard and Agent Plan video model", async () => {

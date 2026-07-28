@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const title = "Seedance 2.0 视频生成演示工作台";
+const title = "Seedance 2.0 视频生成演示与模板资产库";
 const description =
-  "配置、审核并提交 Seedance 视频生成 API 请求，在同一工作台追踪任务状态、结果与请求响应日志。";
+  "从官方提示词与行业模板一键进入 Seedance 视频生成实操台，审核完整 API 请求并追踪任务、结果与请求响应日志。";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -42,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       type: "website",
-      images: [{ url: socialImage, width: 1731, height: 909 }],
+      images: [{ url: socialImage, width: 1730, height: 909 }],
     },
     twitter: {
       card: "summary_large_image",

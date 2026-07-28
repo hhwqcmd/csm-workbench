@@ -58,6 +58,19 @@ export type SeedanceExample = {
 
 const MINI_MODEL = "doubao-seedance-2-0-mini-260615";
 const FULL_MODEL = "doubao-seedance-2-0-260128";
+const CONTINUOUS_VIDEO_SEQUENCE: SeedanceSequencePlan = {
+  model: FULL_MODEL,
+  initialImageUrl:
+    "https://ark-project.tos-cn-beijing.volces.com/doc_image/i2v_foxrgirl.png",
+  prompts: [
+    "女孩抱着狐狸，女孩睁开眼，温柔地看向镜头，狐狸友善地抱着，镜头缓缓拉出，女孩的头发被风吹动",
+    "女孩和狐狸在草地上奔跑，阳光明媚，女孩的笑容灿烂，狐狸欢快地跳跃",
+    "女孩和狐狸坐在树下休息，女孩轻轻抚摸狐狸的毛发，狐狸温顺地趴在女孩腿上",
+  ],
+  ratio: "adaptive",
+  duration: 5,
+  watermark: false,
+};
 
 export const SEEDANCE_EXAMPLES: SeedanceExample[] = [
   {
@@ -268,7 +281,7 @@ export const SEEDANCE_EXAMPLES: SeedanceExample[] = [
   {
     id: "first-last-frame-audio",
     title: "官方示例任务七：图生视频-基于首尾帧（含音频）",
-    summary: "指定女孩画面的首帧和尾帧生成有声视频，并可把返回尾帧继续串成多个连续视频。",
+    summary: "指定女孩画面的首帧和尾帧，生成带有自然过渡和音频的视频。",
     capability: "首帧 + 尾帧 · adaptive · 5 秒 · 有声",
     modelNote: "完整模型；教程原图可能触发真人隐私审核",
     requestBody: {
@@ -298,19 +311,33 @@ export const SEEDANCE_EXAMPLES: SeedanceExample[] = [
       duration: 5,
       watermark: true,
     },
-    continuousSequence: {
+  },
+  {
+    id: "continuous-video-chain",
+    title: "官方示例任务八：生成多个连续视频",
+    summary: "把上一段视频返回的尾帧作为下一段首帧，严格串行生成三段连续内容。",
+    capability: "3 段串行 · 每段 5 秒 · 返回尾帧",
+    modelNote: "完整模型；三段真实任务已验证成功",
+    requestBody: {
       model: FULL_MODEL,
-      initialImageUrl:
-        "https://ark-project.tos-cn-beijing.volces.com/doc_image/i2v_foxrgirl.png",
-      prompts: [
-        "女孩抱着狐狸，女孩睁开眼，温柔地看向镜头，狐狸友善地抱着，镜头缓缓拉出，女孩的头发被风吹动",
-        "女孩和狐狸在草地上奔跑，阳光明媚，女孩的笑容灿烂，狐狸欢快地跳跃",
-        "女孩和狐狸坐在树下休息，女孩轻轻抚摸狐狸的毛发，狐狸温顺地趴在女孩腿上",
+      content: [
+        {
+          type: "text",
+          text: CONTINUOUS_VIDEO_SEQUENCE.prompts[0],
+        },
+        {
+          type: "image_url",
+          image_url: {
+            url: CONTINUOUS_VIDEO_SEQUENCE.initialImageUrl,
+          },
+        },
       ],
       ratio: "adaptive",
       duration: 5,
       watermark: false,
+      return_last_frame: true,
     },
+    continuousSequence: CONTINUOUS_VIDEO_SEQUENCE,
   },
 ];
 
