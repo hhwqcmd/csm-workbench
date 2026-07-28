@@ -1,15 +1,18 @@
-# Seedance 2.0 视频生成演示工作台
+# Seedance 2.0 视频生成演示与模板资产库
 
-面向现场演示和方案验证的 Seedance API 控制台。工作台支持官方 API 与 Agent Plan 两条调用路径，可在同一页面完成：
+面向现场演示和方案验证的 Seedance 平台，包含平级的“演示工作台”和“模板资产库”：
 
 - 选择 API 路径、Base URL、模型和 API Key。
-- 对照官方“香水替换为面霜”示例素材。
+- 浏览八个官方示例和四类模板资产，并一键预填实操参数。
 - 编辑提示词、素材、比例、时长、音频和水印参数。
 - 查看并编辑完整 API Request Body，和表单双向联动。
 - 创建真实任务并每 30 秒查询状态。
 - 在当前浏览器保存最近 30 次提交，查看每次创建和查询的请求/响应日志。
 
 默认连接配置为官方 API 与 `doubao-seedance-2-0-mini-260615`。
+生产站点采用公开直达；每位访问者自行输入凭证，服务端不保存 Key。
+
+[打开生产站点](https://seedance-2-demo-workbench-0724.huanghewq.chatgpt.site/#templates)
 
 ## 本地运行
 
@@ -46,4 +49,6 @@ python3 -m py_compile official-quickstart/python/demo_standard.py
 bash -n official-quickstart/scripts/init_dev_env/setup_mac.sh
 ```
 
-架构、历史决策、安全边界、地雷和提交规范见 [AGENTS.md](./AGENTS.md)，详细调用流程见 [docs/task-runner.md](./docs/task-runner.md)。
+当前规则、模块地图、安全边界和提交规范见 [AGENTS.md](./AGENTS.md)；
+架构原因见 [docs/decisions.md](./docs/decisions.md)，真实 API 验收见
+[docs/validation-log.md](./docs/validation-log.md)。

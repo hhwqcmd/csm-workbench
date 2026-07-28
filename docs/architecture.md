@@ -60,7 +60,7 @@ run_demo.sh
 - 八个官方示例集中定义在 `app/lib/seedance-examples.ts`；示例卡片通过显式事件把整份 Request Body 和可选连续生成计划交给实操台，避免页面展示值与实际请求分叉。连续生成是独立的任务八，不再依附任务七。
 - `WorkspaceShell` 管理“演示工作台 / 模板资产库”两个平级视图；两者始终复用同一个 `SeedanceTaskRunner`，不得在模板页复制凭证、任务、历史或日志状态。
 - 模板预填统一通过 `seedance:apply-example` 事件进入任务执行器；影视和营销模板允许用空 URL 表达缺失素材，执行器既有的 `requestReady` 校验会在补齐前阻止真实提交。
-- 四类模板集中定义在 `app/lib/template-assets.ts`。普通模板只复制提示词；具备完整公开素材的模板通过相同 `seedance:apply-example` 事件把整份 Request Body 交给实操台。
+- 四类模板集中定义在 `app/lib/template-assets.ts`。提示词公式只提供复制；电商、影视和营销场景模板通过相同 `seedance:apply-example` 事件把整份 Request Body 交给实操台，缺失素材用空 URL 表达。
 - 连续视频链路仍复用同一创建/查询 API；每段的 `last_frame_url` 只在上一段成功后作为下一段输入，不引入新的服务端代理入口。
 
 ## 状态模型
@@ -68,7 +68,7 @@ run_demo.sh
 工作台统一使用以下演示状态：
 
 - `draft`：参数尚未确认。
-- `ready`：参数已校验，等待用户创建任务。
+- `submitting`：本地历史已建档，正在请求创建远端任务。
 - `queued`：远端已接受任务。
 - `running`：生成中。
 - `succeeded`：生成完成，可展示结果 URL。
