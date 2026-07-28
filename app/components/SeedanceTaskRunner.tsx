@@ -1965,9 +1965,13 @@ function parseMediaContent(value: unknown): MediaEditorItem {
       throw new Error(`${type}.role 必须是 ${requiredRole}。`);
     }
   }
+  if (typeof payload.url !== "string") {
+    throw new Error(`${payloadName}.url 必须是字符串。`);
+  }
   return {
     type,
-    url: stringValue(payload.url, `${payloadName}.url`),
+    // 模板资产可以用空 URL 表达“素材待补”；requestReady 会在补齐前阻止提交。
+    url: payload.url.trim(),
     role,
   };
 }

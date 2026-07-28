@@ -55,7 +55,7 @@ export function TemplateAssetLibrary() {
             变成下一条成片。
           </h1>
           <p className="hero-summary">
-            从官方提示词指南移植可复用公式与案例，并补齐两条可直接进入实操台的电商宣发模板。复制用于改写，或一键填入完整 API。
+            从官方提示词指南移植可复用公式与案例，电商、影视短剧和营销模板均可一键进入实操台。素材完整的案例可直接审核请求；素材待补的案例会保留可编辑空位。
           </p>
           <div className="asset-hero-actions">
             <button
@@ -105,7 +105,7 @@ export function TemplateAssetLibrary() {
             <h2>按场景选模板，按需改内容</h2>
           </div>
           <p>
-            官方模板保持原始素材指代；“工作台预置案例”已配好模型、公开素材、比例、时长与音频参数。
+            所有场景模板都可填入实操台；官方公开素材会直接带入，缺失素材保留空位，未补齐前不会开放真实提交。
           </p>
         </div>
 
@@ -171,7 +171,11 @@ export function TemplateAssetLibrary() {
                     <div className="asset-card-body">
                       <div className="asset-source-row">
                         <span>{asset.source}</span>
-                        {asset.runnableExample && <em>可运行</em>}
+                        {asset.runnableExample && (
+                          <em>
+                            {asset.hasMissingMaterials ? "素材待补" : "可运行"}
+                          </em>
+                        )}
                       </div>
                       <h4>{asset.title}</h4>
                       <p>{asset.summary}</p>

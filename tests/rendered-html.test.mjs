@@ -110,7 +110,10 @@ test("server-renders the four-category template asset library", async () => {
   }
 
   assert.equal((html.match(/复制提示词/g) ?? []).length, 16);
-  assert.equal((html.match(/data-testid="apply-template-/g) ?? []).length, 2);
+  assert.equal((html.match(/data-testid="apply-template-/g) ?? []).length, 10);
+  assert.match(html, /apply-template-drama-extend-reunion/);
+  assert.match(html, /apply-template-marketing-golden-horse/);
+  assert.match(html, /素材待补/);
   assert.match(html, /doubao-seedance-2-0-mini-260615/);
   assert.match(html, /9:16/);
   assert.match(html, /8 秒/);
@@ -131,9 +134,13 @@ test("keeps template application on the existing task runner path", async () => 
   assert.match(librarySource, /APPLY_EXAMPLE_EVENT/);
   assert.match(librarySource, /navigateWorkspace\("workbench"\)/);
   assert.doesNotMatch(librarySource, /fetch\(/);
-  assert.equal((assetSource.match(/runnableExample:/g) ?? []).length, 2);
+  assert.equal((assetSource.match(/runnableExample:/g) ?? []).length, 10);
   assert.match(assetSource, /template-commerce-cloud-cream/);
   assert.match(assetSource, /template-commerce-iced-tea/);
+  assert.match(assetSource, /template-drama-extend-reunion/);
+  assert.match(assetSource, /template-marketing-golden-horse/);
+  assert.match(assetSource, /DRAMA_EXTEND_VIDEO_URL/);
+  assert.match(assetSource, /MARKETING_GOLDEN_HORSE_VIDEO_URL/);
   assert.doesNotMatch(assetSource, /ark-[a-z0-9-]{20,}/i);
 });
 
@@ -165,6 +172,7 @@ test("persists task logs and repeats polling while a task remains active", async
   assert.match(runnerSource, /查看日志/);
   assert.match(runnerSource, /response: capturedResponse/);
   assert.match(runnerSource, /parseEditableApiBody/);
+  assert.match(runnerSource, /模板资产可以用空 URL 表达“素材待补”/);
   assert.match(runnerSource, /setPollCycle\(\(current\) => current \+ 1\)/);
   assert.match(runnerSource, /状态查询暂时失败，将在 30 秒后重试/);
   assert.match(runnerSource, /lastFrameUrl/);

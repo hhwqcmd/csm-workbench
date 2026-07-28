@@ -16,6 +16,7 @@ export type TemplateAsset = {
   inputHint: string;
   source: "火山方舟提示词指南" | "工作台预置案例";
   runnableExample?: SeedanceExample;
+  hasMissingMaterials?: boolean;
   previewImageUrl?: string;
 };
 
@@ -44,13 +45,13 @@ export const TEMPLATE_CATEGORIES: Array<{
     id: "drama",
     label: "影视短剧模板",
     eyebrow: "Drama",
-    description: "面向人物一致性、分镜时序、动作和对白的官方案例。",
+    description: "面向人物一致性、分镜时序、动作和对白的可预填官方案例。",
   },
   {
     id: "marketing",
     label: "营销短视频模板",
     eyebrow: "Marketing",
-    description: "覆盖品牌露出、产品转化、视觉概念与特效参考。",
+    description: "覆盖品牌露出、产品转化、视觉概念与特效参考的可预填案例。",
   },
 ];
 
@@ -59,6 +60,22 @@ const CREAM_IMAGE_URL =
   "https://ark-project.tos-cn-beijing.volces.com/doc_image/r2v_edit_pic1.jpg";
 const ICED_TEA_IMAGE_URL =
   "https://ark-project.tos-cn-beijing.volces.com/doc_image/r2v_tea_pic2.jpg";
+const DRAMA_FIGHT_IMAGE_URL =
+  "https://p9-arcosite.byteimg.com/tos-cn-i-goo7wpa0wc/4b419b0cc45043dd8a865d719a50436b~tplv-goo7wpa0wc-image.image";
+const DRAMA_FIGHT_VIDEO_URL =
+  "https://p9-arcosite.byteimg.com/obj/tos-cn-i-goo7wpa0wc/06ffca9604a14ae4a289bed8cdc115b3";
+const DRAMA_STORYBOARD_IMAGE_URL =
+  "https://p9-arcosite.byteimg.com/tos-cn-i-goo7wpa0wc/54a850099e3341b7bb0d290d7e9aa7dc~tplv-goo7wpa0wc-image.image";
+const DRAMA_EXTEND_VIDEO_URL =
+  "https://p9-arcosite.byteimg.com/obj/tos-cn-i-goo7wpa0wc/127e451399294911aa6803c857ee262b";
+const MARKETING_GOLDEN_HORSE_VIDEO_URL =
+  "https://p9-arcosite.byteimg.com/obj/tos-cn-i-goo7wpa0wc/95339be0b83b446496bebcaac0ed62e4";
+const MARKETING_TECH_VIDEO_URL =
+  "https://p9-arcosite.byteimg.com/obj/tos-cn-i-goo7wpa0wc/94aa83c27b7f4731b82b4edda6b8e420";
+const MARKETING_TECH_IMAGE_URL =
+  "https://p9-arcosite.byteimg.com/tos-cn-i-goo7wpa0wc/37e0d8db140e42f3805addfef1c867b1~tplv-goo7wpa0wc-image.image";
+const MARKETING_CYBER_IMAGE_URL =
+  "https://p9-arcosite.byteimg.com/tos-cn-i-goo7wpa0wc/9462730dc4fe4bda8eca885357be15c1~tplv-goo7wpa0wc-image.image";
 
 const CLOUD_CREAM_PROMPT =
   "生成一支 8 秒竖屏电商种草视频。图片1中的云朵修护面霜摆在浅米色洞石台面上，背景是晨光照进的干净浴室。镜头1：微距缓慢推近，展示瓶身与柔和高光；镜头2：一只手自然打开瓶盖，用指尖轻轻带起绵密霜体，突出柔软、轻盈、易推开的质感；镜头3：面霜回到画面中央，周围出现轻薄水雾，定格为高级产品英雄镜头。全片暖白色调、真实商业摄影质感、动作连贯，无人物正脸、无字幕、无额外 Logo。背景为轻柔水声和细腻 ASMR 音效。";
@@ -207,8 +224,42 @@ export const TEMPLATE_ASSETS: TemplateAsset[] = [
     prompt:
       "@图片1的红衣女子作为女主，@图片2的黑衣女子作为对手，场景参考@图片3的悬崖竹林环境，整体运镜和动作节奏参考@视频1，背景音效与@音频1同步。整体画面烟雨江湖电影感，冷调低饱和，电影胶片质感，光影层次丰富；人物面部和身体比例稳定不变形，动作连贯自然，不僵硬，无穿模无卡顿。",
     tags: ["武侠", "双角色", "动作参考"],
-    inputHint: "需要 3 张图片、1 段动作视频和 1 段音频。",
+    inputHint: "已预填 3 张图片、1 段视频和 1 段音频的空素材位，请按角色与场景顺序补齐。",
     source: "火山方舟提示词指南",
+    hasMissingMaterials: true,
+    runnableExample: {
+      id: "template-drama-wuxia",
+      title: "模板资产：武侠双人对决",
+      summary: "双角色、场景、动作与音效共同驱动的武侠短剧。",
+      capability: "3 图 + 1 视频 + 1 音频 · 素材待补",
+      modelNote: "Seedance 2.0 Mini；提交前补齐全部素材",
+      requestBody: {
+        model: COMMERCE_MODEL,
+        content: [
+          {
+            type: "text",
+            text: "@图片1的红衣女子作为女主，@图片2的黑衣女子作为对手，场景参考@图片3的悬崖竹林环境，整体运镜和动作节奏参考@视频1，背景音效与@音频1同步。整体画面烟雨江湖电影感，冷调低饱和，电影胶片质感，光影层次丰富；人物面部和身体比例稳定不变形，动作连贯自然，不僵硬，无穿模无卡顿。",
+          },
+          { type: "image_url", image_url: { url: "" }, role: "reference_image" },
+          { type: "image_url", image_url: { url: "" }, role: "reference_image" },
+          { type: "image_url", image_url: { url: "" }, role: "reference_image" },
+          {
+            type: "video_url",
+            video_url: { url: "" },
+            role: "reference_video",
+          },
+          {
+            type: "audio_url",
+            audio_url: { url: "" },
+            role: "reference_audio",
+          },
+        ],
+        generate_audio: true,
+        ratio: "16:9",
+        duration: 8,
+        watermark: true,
+      },
+    },
   },
   {
     id: "drama-fight-reference",
@@ -218,8 +269,40 @@ export const TEMPLATE_ASSETS: TemplateAsset[] = [
     prompt:
       "参考`视频1`的人物动作和镜头语言，生成`图片2`和`图片1`的打斗场面，`图片2`是左边人物，`图片1`是右边人物。有激烈的背景音乐。",
     tags: ["打斗", "运镜", "角色替换"],
-    inputHint: "需要 2 张角色图和 1 段动作参考视频。",
+    inputHint: "已预置官方角色拼图与动作视频；请补充第 2 张独立角色图后提交。",
     source: "火山方舟提示词指南",
+    hasMissingMaterials: true,
+    runnableExample: {
+      id: "template-drama-fight-reference",
+      title: "模板资产：影视打斗动作参考",
+      summary: "复用动作视频的节奏与运镜，生成指定角色的打斗场面。",
+      capability: "2 图 + 1 视频 · 1 张角色图待补",
+      modelNote: "Seedance 2.0 Mini",
+      requestBody: {
+        model: COMMERCE_MODEL,
+        content: [
+          {
+            type: "text",
+            text: "参考`视频1`的人物动作和镜头语言，生成`图片2`和`图片1`的打斗场面，`图片2`是左边人物，`图片1`是右边人物。有激烈的背景音乐。",
+          },
+          {
+            type: "image_url",
+            image_url: { url: DRAMA_FIGHT_IMAGE_URL },
+            role: "reference_image",
+          },
+          { type: "image_url", image_url: { url: "" }, role: "reference_image" },
+          {
+            type: "video_url",
+            video_url: { url: DRAMA_FIGHT_VIDEO_URL },
+            role: "reference_video",
+          },
+        ],
+        generate_audio: true,
+        ratio: "16:9",
+        duration: 5,
+        watermark: true,
+      },
+    },
   },
   {
     id: "drama-storyboard-dialogue",
@@ -229,8 +312,37 @@ export const TEMPLATE_ASSETS: TemplateAsset[] = [
     prompt:
       "参考`图片3`中的分镜构图，女孩正在等爸爸做好饭，她说：“아빠， 배고파요！ 밥 다 됐어요？”，女孩形象参考`图片1`。接着镜头向右横摇，切换至`图片4`的画面和构图，爸爸形象参考`图片2`，爸爸回答她：“거의 다 됐어， 조금만 기다려！”，接着镜头切换回女儿略显失落的面部表情特写，她说：“아직 멀었어요？ 맛있는 냄새 나는데。。。”，接着切换成爸爸的面部特写，他说：“이제 진짜 금방이야。＂빨리빨리＂ 하지 말고 손부터 씻고 와！”。",
     tags: ["分镜", "对白", "横摇"],
-    inputHint: "需要 2 张角色图和 2 张分镜构图。",
+    inputHint: "已预置官方分镜拼图；另外 3 个图片素材位留空，便于替换独立角色与构图。",
     source: "火山方舟提示词指南",
+    hasMissingMaterials: true,
+    runnableExample: {
+      id: "template-drama-storyboard-dialogue",
+      title: "模板资产：父女对话分镜",
+      summary: "角色图与分镜构图共同驱动的多镜头韩语对白短剧。",
+      capability: "4 图 · 3 个独立素材位待补",
+      modelNote: "Seedance 2.0 Mini",
+      requestBody: {
+        model: COMMERCE_MODEL,
+        content: [
+          {
+            type: "text",
+            text: "参考`图片3`中的分镜构图，女孩正在等爸爸做好饭，她说：“아빠， 배고파요！ 밥 다 됐어요？”，女孩形象参考`图片1`。接着镜头向右横摇，切换至`图片4`的画面和构图，爸爸形象参考`图片2`，爸爸回答她：“거의 다 됐어， 조금만 기다려！”，接着镜头切换回女儿略显失落的面部表情特写，她说：“아직 멀었어요？ 맛있는 냄새 나는데。。。”，接着切换成爸爸的面部特写，他说：“이제 진짜 금방이야。＂빨리빨리＂ 하지 말고 손부터 씻고 와！”。",
+          },
+          {
+            type: "image_url",
+            image_url: { url: DRAMA_STORYBOARD_IMAGE_URL },
+            role: "reference_image",
+          },
+          { type: "image_url", image_url: { url: "" }, role: "reference_image" },
+          { type: "image_url", image_url: { url: "" }, role: "reference_image" },
+          { type: "image_url", image_url: { url: "" }, role: "reference_image" },
+        ],
+        generate_audio: true,
+        ratio: "16:9",
+        duration: 12,
+        watermark: true,
+      },
+    },
   },
   {
     id: "drama-extend-reunion",
@@ -240,8 +352,33 @@ export const TEMPLATE_ASSETS: TemplateAsset[] = [
     prompt:
       "生成`视频1`之后的内容，迟到的两个男士跑向他们，五个人终于见面，友好聊天。",
     tags: ["视频延长", "群像", "剧情衔接"],
-    inputHint: "需要 1 段待向后延长的剧情视频。",
+    inputHint: "已预置官方待延长视频，可直接填入实操台。",
     source: "火山方舟提示词指南",
+    runnableExample: {
+      id: "template-drama-extend-reunion",
+      title: "模板资产：剧情向后延长",
+      summary: "从原片结尾继续人物入场、重逢与群像交流。",
+      capability: "1 视频 · adaptive · 5 秒 · 有声",
+      modelNote: "Seedance 2.0 Mini；官方公开素材",
+      requestBody: {
+        model: COMMERCE_MODEL,
+        content: [
+          {
+            type: "text",
+            text: "生成`视频1`之后的内容，迟到的两个男士跑向他们，五个人终于见面，友好聊天。",
+          },
+          {
+            type: "video_url",
+            video_url: { url: DRAMA_EXTEND_VIDEO_URL },
+            role: "reference_video",
+          },
+        ],
+        generate_audio: true,
+        ratio: "adaptive",
+        duration: 5,
+        watermark: true,
+      },
+    },
   },
   {
     id: "marketing-slogan",
@@ -251,8 +388,30 @@ export const TEMPLATE_ASSETS: TemplateAsset[] = [
     prompt:
       "手绘漫画风格，三个人围坐在一起吃`图片1`中的炸鸡，气氛友好愉悦，后画面逐渐模糊，画面中部显示文字“快乐尽在 Seedance”。",
     tags: ["Slogan", "文字生成", "品牌收尾"],
-    inputHint: "需要 1 张产品图；可替换广告语和文字出现位置。",
+    inputHint: "已预填产品图片空素材位；可同时替换广告语和文字出现位置。",
     source: "火山方舟提示词指南",
+    hasMissingMaterials: true,
+    runnableExample: {
+      id: "template-marketing-slogan",
+      title: "模板资产：品牌 Slogan 收尾",
+      summary: "用产品图驱动漫画风品牌短片，并以广告语收束。",
+      capability: "1 图 · 素材待补 · 5 秒 · 有声",
+      modelNote: "Seedance 2.0 Mini",
+      requestBody: {
+        model: COMMERCE_MODEL,
+        content: [
+          {
+            type: "text",
+            text: "手绘漫画风格，三个人围坐在一起吃`图片1`中的炸鸡，气氛友好愉悦，后画面逐渐模糊，画面中部显示文字“快乐尽在 Seedance”。",
+          },
+          { type: "image_url", image_url: { url: "" }, role: "reference_image" },
+        ],
+        generate_audio: true,
+        ratio: "16:9",
+        duration: 5,
+        watermark: true,
+      },
+    },
   },
   {
     id: "marketing-golden-horse",
@@ -262,8 +421,33 @@ export const TEMPLATE_ASSETS: TemplateAsset[] = [
     prompt:
       "参考`视频1`中马的奔跑形态，生成一匹金色的骏马在草原上奔跑，随即定格其奔跑的华丽姿态，变成一个马形的金吊坠。",
     tags: ["珠宝", "形态转换", "动作参考"],
-    inputHint: "需要 1 段马匹奔跑参考视频。",
+    inputHint: "已预置官方马匹奔跑参考视频，可直接填入实操台。",
     source: "火山方舟提示词指南",
+    runnableExample: {
+      id: "template-marketing-golden-horse",
+      title: "模板资产：骏马变黄金吊坠",
+      summary: "复用奔跑动态，完成自然主体到珠宝英雄镜头的形态转换。",
+      capability: "1 视频 · 16:9 · 5 秒 · 有声",
+      modelNote: "Seedance 2.0 Mini；官方公开素材",
+      requestBody: {
+        model: COMMERCE_MODEL,
+        content: [
+          {
+            type: "text",
+            text: "参考`视频1`中马的奔跑形态，生成一匹金色的骏马在草原上奔跑，随即定格其奔跑的华丽姿态，变成一个马形的金吊坠。",
+          },
+          {
+            type: "video_url",
+            video_url: { url: MARKETING_GOLDEN_HORSE_VIDEO_URL },
+            role: "reference_video",
+          },
+        ],
+        generate_audio: true,
+        ratio: "16:9",
+        duration: 5,
+        watermark: true,
+      },
+    },
   },
   {
     id: "marketing-tech-park",
@@ -273,8 +457,38 @@ export const TEMPLATE_ASSETS: TemplateAsset[] = [
     prompt:
       "参考`视频1`的运镜，做一个科技园区的概念视频，以`图片1`中的高楼为视觉中心，同为第一视角俯冲，体现出`图片1`中园区的科技感。",
     tags: ["科技", "第一视角", "概念片"],
-    inputHint: "需要 1 段运镜参考视频和 1 张园区高楼图片。",
+    inputHint: "已预置官方运镜视频和园区高楼图，可直接填入实操台。",
     source: "火山方舟提示词指南",
+    runnableExample: {
+      id: "template-marketing-tech-park",
+      title: "模板资产：科技园区概念片",
+      summary: "参考第一视角俯冲运镜，建立园区高楼的科技视觉中心。",
+      capability: "1 图 + 1 视频 · 16:9 · 5 秒",
+      modelNote: "Seedance 2.0 Mini；官方公开素材",
+      requestBody: {
+        model: COMMERCE_MODEL,
+        content: [
+          {
+            type: "text",
+            text: "参考`视频1`的运镜，做一个科技园区的概念视频，以`图片1`中的高楼为视觉中心，同为第一视角俯冲，体现出`图片1`中园区的科技感。",
+          },
+          {
+            type: "image_url",
+            image_url: { url: MARKETING_TECH_IMAGE_URL },
+            role: "reference_image",
+          },
+          {
+            type: "video_url",
+            video_url: { url: MARKETING_TECH_VIDEO_URL },
+            role: "reference_video",
+          },
+        ],
+        generate_audio: true,
+        ratio: "16:9",
+        duration: 5,
+        watermark: true,
+      },
+    },
   },
   {
     id: "marketing-cyber-logo",
@@ -284,7 +498,34 @@ export const TEMPLATE_ASSETS: TemplateAsset[] = [
     prompt:
       "背景是霓虹闪烁的未来都市空中廊道，飞行器与全息广告交织，参考`图片2`中的女孩，先用中景展示女孩放飞带有全息投影的银色悬浮灯，再镜头拉远展现漫天悬浮灯，画面逐渐模糊，后出现`图片1`的 Logo，整体风格为 3D 赛博朋克科幻动画风格。",
     tags: ["Logo", "赛博朋克", "品牌片"],
-    inputHint: "需要 1 张 Logo 图片和 1 张人物参考图。",
+    inputHint: "已预置官方 Logo/人物拼图，另保留 1 个独立图片空素材位便于替换。",
     source: "火山方舟提示词指南",
+    hasMissingMaterials: true,
+    runnableExample: {
+      id: "template-marketing-cyber-logo",
+      title: "模板资产：赛博都市 Logo 露出",
+      summary: "通过未来都市情绪铺陈和悬浮灯动作完成 Logo 收尾。",
+      capability: "2 图 · 1 个独立素材位待补",
+      modelNote: "Seedance 2.0 Mini",
+      requestBody: {
+        model: COMMERCE_MODEL,
+        content: [
+          {
+            type: "text",
+            text: "背景是霓虹闪烁的未来都市空中廊道，飞行器与全息广告交织，参考`图片2`中的女孩，先用中景展示女孩放飞带有全息投影的银色悬浮灯，再镜头拉远展现漫天悬浮灯，画面逐渐模糊，后出现`图片1`的 Logo，整体风格为 3D 赛博朋克科幻动画风格。",
+          },
+          {
+            type: "image_url",
+            image_url: { url: MARKETING_CYBER_IMAGE_URL },
+            role: "reference_image",
+          },
+          { type: "image_url", image_url: { url: "" }, role: "reference_image" },
+        ],
+        generate_audio: true,
+        ratio: "16:9",
+        duration: 5,
+        watermark: true,
+      },
+    },
   },
 ];
