@@ -1,18 +1,23 @@
 import {
-  manageManagedAgent,
+  manageManagedMemory,
   ManagedAgentsValidationError,
-  parseManageManagedAgentInput,
+  parseManageManagedMemoryInput,
 } from "../../../lib/managed-agents-server";
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const result = await manageManagedAgent(
-      parseManageManagedAgentInput(await request.json()),
+    const result = await manageManagedMemory(
+      parseManageManagedMemoryInput(await request.json()),
     );
-    return Response.json(result, {
-      status: 201,
+    return Response.json(
+      result.status === 204
+        ? { deleted: true, upstream_http_status: 204 }
+        : result.payload,
+      {
+      status: result.status === 204 ? 200 : result.status,
       headers: { "cache-control": "no-store" },
-    });
+      },
+    );
   } catch (error) {
     return errorResponse(error);
   }
@@ -20,7 +25,9 @@ export async function POST(request: Request): Promise<Response> {
 
 function errorResponse(error: unknown): Response {
   const message =
-    error instanceof Error ? error.message : "管理 Agent 时发生未知错误。";
+    error instanceof Error
+      ? error.message
+      : "管理 Memory Store 时发生未知错误。";
   return Response.json(
     { error: message },
     {

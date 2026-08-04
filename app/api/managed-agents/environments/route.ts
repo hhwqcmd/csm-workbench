@@ -20,7 +20,9 @@ export async function POST(request: Request): Promise<Response> {
 
 function errorResponse(error: unknown): Response {
   const message =
-    error instanceof Error ? error.message : "创建环境时发生未知错误。";
+    error instanceof Error
+      ? error.message
+      : "配置 Agent 环境时发生未知错误。";
   return Response.json(
     { error: message },
     {

@@ -24,11 +24,10 @@ export function SeedanceExampleGallery() {
       <div className="section-heading sample-heading">
         <div>
           <p className="eyebrow">官方示例任务</p>
-          <h2>八条能力链路，一键填入实操台</h2>
+          <h2>八类官方示例</h2>
         </div>
         <p>
-          参数与素材取自官方教程；点击“填入参数”会同步更新模型、素材、输出规格和完整
-          API Request Body，不会自动提交任务。
+          官方参数可载入工作台；仅预填，不提交任务。
         </p>
       </div>
 

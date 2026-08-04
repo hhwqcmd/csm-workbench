@@ -1,4 +1,11 @@
-export type WorkspaceView = "workbench" | "templates" | "managed-agents";
+export type WorkspaceView =
+  | "workbench"
+  | "templates"
+  | "seedream"
+  | "managed-agents"
+  | "responses"
+  | "llm-trends"
+  | "ai-coding";
 
 export const WORKSPACE_NAVIGATE_EVENT = "seedance:navigate-workspace";
 

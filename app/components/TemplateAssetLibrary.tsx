@@ -50,12 +50,12 @@ export function TemplateAssetLibrary() {
         <div>
           <p className="eyebrow">SEEDANCE TEMPLATE LIBRARY</p>
           <h1>
-            把成熟模板，
+            视频模板
             <br />
-            变成下一条成片。
+            资产库
           </h1>
           <p className="hero-summary">
-            从官方提示词指南移植可复用公式与案例，电商、影视短剧和营销模板均可一键进入实操台。素材完整的案例可直接审核请求；素材待补的案例会保留可编辑空位。
+            电商 · 影视短剧 · 营销视频 · 参数预填
           </p>
           <div className="asset-hero-actions">
             <button
@@ -63,7 +63,7 @@ export function TemplateAssetLibrary() {
               type="button"
               onClick={() => setActiveCategory("commerce")}
             >
-              查看可运行案例
+              可运行案例
             </button>
             <a
               className="secondary-action"
@@ -102,10 +102,10 @@ export function TemplateAssetLibrary() {
         <div className="section-heading asset-heading">
           <div>
             <p className="eyebrow">模板资产库</p>
-            <h2>按场景选模板，按需改内容</h2>
+            <h2>模板分类</h2>
           </div>
           <p>
-            所有场景模板都可填入实操台；官方公开素材会直接带入，缺失素材保留空位，未补齐前不会开放真实提交。
+            模板可直接预填；缺失素材补齐后方可提交。
           </p>
         </div>
 
