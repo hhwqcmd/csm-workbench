@@ -5,15 +5,74 @@ import {
   WORKSPACE_NAVIGATE_EVENT,
   type WorkspaceView,
 } from "../lib/workspace-navigation";
+import { AiCodingWorkbench } from "./AiCodingWorkbench";
 import { ManagedAgentsWorkbench } from "./ManagedAgentsWorkbench";
+import { LlmTrendsWorkbench } from "./LlmTrendsWorkbench";
+import { ResponsesWorkbench } from "./ResponsesWorkbench";
 import { SeedanceExampleGallery } from "./SeedanceExampleGallery";
 import { SeedanceTaskRunner } from "./SeedanceTaskRunner";
+import { SeedreamWorkbench } from "./SeedreamWorkbench";
 import { TemplateAssetLibrary } from "./TemplateAssetLibrary";
 
+const WORKSPACE_VIEWS: Array<{
+  id: WorkspaceView;
+  index: string;
+  label: string;
+  shortLabel: string;
+}> = [
+  { id: "workbench", index: "01", label: "演示工作台", shortLabel: "视频" },
+  { id: "templates", index: "02", label: "模板资产库", shortLabel: "模板" },
+  { id: "seedream", index: "03", label: "Seedream 演示", shortLabel: "图片" },
+  { id: "responses", index: "04", label: "Responses API", shortLabel: "Resp." },
+  {
+    id: "managed-agents",
+    index: "05",
+    label: "Managed Agents",
+    shortLabel: "Agent",
+  },
+  {
+    id: "llm-trends",
+    index: "06",
+    label: "LLM 趋势",
+    shortLabel: "趋势",
+  },
+  {
+    id: "ai-coding",
+    index: "07",
+    label: "AI coding",
+    shortLabel: "Code",
+  },
+];
+
 function viewFromHash(): WorkspaceView {
+  const hash = window.location.hash;
   if (window.location.hash.startsWith("#templates")) return "templates";
+  if (window.location.hash.startsWith("#seedream")) return "seedream";
   if (window.location.hash.startsWith("#managed-agents")) {
     return "managed-agents";
+  }
+  if (window.location.hash.startsWith("#responses")) return "responses";
+  if (
+    [
+      "#llm-trends",
+      "#model-landscape",
+      "#benchmark-lens",
+      "#leaderboards",
+      "#trend-sources",
+    ].some((anchor) => hash.startsWith(anchor))
+  ) {
+    return "llm-trends";
+  }
+  if (
+    [
+      "#ai-coding",
+      "#agent-assets",
+      "#project-assets",
+      "#code-quality",
+      "#ai-metrics",
+    ].some((anchor) => hash.startsWith(anchor))
+  ) {
+    return "ai-coding";
   }
   return "workbench";
 }
@@ -24,6 +83,15 @@ export function WorkspaceShell() {
   useEffect(() => {
     function syncHash() {
       setView(viewFromHash());
+      const targetId = window.location.hash.slice(1);
+      if (!targetId) return;
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          document
+            .getElementById(targetId)
+            ?.scrollIntoView({ behavior: "auto", block: "start" });
+        });
+      });
     }
 
     function handleNavigate(event: Event) {
@@ -31,7 +99,11 @@ export function WorkspaceShell() {
       if (
         nextView !== "workbench" &&
         nextView !== "templates" &&
-        nextView !== "managed-agents"
+        nextView !== "seedream" &&
+        nextView !== "managed-agents" &&
+        nextView !== "responses" &&
+        nextView !== "llm-trends" &&
+        nextView !== "ai-coding"
       ) {
         return;
       }
@@ -39,18 +111,34 @@ export function WorkspaceShell() {
       const nextHash =
         nextView === "templates"
           ? "#templates"
-          : nextView === "managed-agents"
-            ? "#managed-agents"
-            : "#operations";
+          : nextView === "seedream"
+            ? "#seedream"
+            : nextView === "managed-agents"
+              ? "#managed-agents"
+              : nextView === "responses"
+                ? "#responses"
+                : nextView === "llm-trends"
+                  ? "#llm-trends"
+                  : nextView === "ai-coding"
+                    ? "#ai-coding"
+                : "#operations";
       window.history.replaceState(null, "", nextHash);
       window.setTimeout(() => {
         document
           .getElementById(
             nextView === "templates"
               ? "templates"
-              : nextView === "managed-agents"
-                ? "managed-agents"
-                : "operations",
+              : nextView === "seedream"
+                ? "seedream"
+                : nextView === "managed-agents"
+                  ? "managed-agents"
+                  : nextView === "responses"
+                    ? "responses"
+                    : nextView === "llm-trends"
+                      ? "llm-trends"
+                      : nextView === "ai-coding"
+                        ? "ai-coding"
+                    : "operations",
           )
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 0);
@@ -65,17 +153,39 @@ export function WorkspaceShell() {
     };
   }, []);
 
+  useEffect(() => {
+    const targetId = window.location.hash.slice(1);
+    if (!targetId) return;
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .getElementById(targetId)
+        ?.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [view]);
+
   function selectView(nextView: WorkspaceView) {
     setView(nextView);
     const nextHash =
       nextView === "templates"
         ? "#templates"
-        : nextView === "managed-agents"
-          ? "#managed-agents"
-          : "#top";
+        : nextView === "seedream"
+          ? "#seedream"
+          : nextView === "managed-agents"
+            ? "#managed-agents"
+            : nextView === "responses"
+              ? "#responses"
+              : nextView === "llm-trends"
+                ? "#llm-trends"
+                : nextView === "ai-coding"
+                  ? "#ai-coding"
+              : "#top";
     window.history.replaceState(null, "", nextHash);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  const activeView =
+    WORKSPACE_VIEWS.find((item) => item.id === view) ?? WORKSPACE_VIEWS[0];
 
   return (
     <main>
@@ -89,41 +199,32 @@ export function WorkspaceShell() {
           <span className="brand-mark">ARK</span>
           <span>
             <strong>火山方舟 Demo Studio</strong>
-            <small>视频生成 · 模板资产 · Managed Agents</small>
+            <small>全链路 API 演示控制台</small>
           </span>
         </button>
 
         <nav className="workspace-switcher" aria-label="顶级栏目">
-          <button
-            aria-current={view === "workbench" ? "page" : undefined}
-            className={view === "workbench" ? "is-active" : ""}
-            data-testid="workspace-workbench"
-            onClick={() => selectView("workbench")}
-            type="button"
-          >
-            演示工作台
-          </button>
-          <button
-            aria-current={view === "templates" ? "page" : undefined}
-            className={view === "templates" ? "is-active" : ""}
-            data-testid="workspace-templates"
-            onClick={() => selectView("templates")}
-            type="button"
-          >
-            模板资产库
-          </button>
-          <button
-            aria-current={view === "managed-agents" ? "page" : undefined}
-            className={view === "managed-agents" ? "is-active" : ""}
-            data-testid="workspace-managed-agents"
-            onClick={() => selectView("managed-agents")}
-            type="button"
-          >
-            Managed Agents
-          </button>
+          {WORKSPACE_VIEWS.map((item) => (
+            <button
+              aria-current={view === item.id ? "page" : undefined}
+              className={view === item.id ? "is-active" : ""}
+              data-short-label={item.shortLabel}
+              data-testid={`workspace-${item.id}`}
+              key={item.id}
+              onClick={() => selectView(item.id)}
+              type="button"
+            >
+              <span className="workspace-tab-index">{item.index}</span>
+              <span className="workspace-tab-label">{item.label}</span>
+            </button>
+          ))}
         </nav>
 
         <div className="topbar-actions">
+          <span className="module-position" aria-label={`当前栏目 ${activeView.index} / 07`}>
+            {activeView.index}
+            <small>/ 07</small>
+          </span>
           <span className="local-badge">本地演示模式</span>
           {view === "workbench" && (
             <>
@@ -138,14 +239,25 @@ export function WorkspaceShell() {
           <a
             className="doc-link"
             href={
-              view === "managed-agents"
+              view === "responses"
+                ? "https://docs.volcengine.com/docs/82379/1585128?lang=zh"
+                : view === "ai-coding"
+                ? "https://docs.trae.cn/cli_what-is-trae-cli"
+                : view === "llm-trends"
+                ? "https://www.volcengine.com/product/doubao"
+                : view === "managed-agents"
                 ? "https://docs.volcengine.com/docs/82379/2553714?lang=zh"
+                : view === "seedream"
+                  ? "https://docs.volcengine.com/docs/82379/1824121?lang=zh"
                 : "https://docs.volcengine.com/docs/82379/2291680?lang=zh"
             }
             target="_blank"
             rel="noreferrer"
           >
-            官方 API 文档 ↗
+            <span className="doc-link-full">
+              {view === "ai-coding" ? "实践来源 ↗" : "官方 API 文档 ↗"}
+            </span>
+            <span className="doc-link-short">文档 ↗</span>
           </a>
         </div>
       </header>
@@ -159,27 +271,26 @@ export function WorkspaceShell() {
           <div className="hero-copy">
             <p className="eyebrow">SEEDANCE API DEMO CONSOLE</p>
             <h1>
-              从完整请求，
+              视频生成
               <br />
-              一路演示到结果。
+              API 工作台
             </h1>
             <p className="hero-summary">
-              面向现场讲解与方案验证：配置官方 API 或 Agent
-              Plan、审核完整请求、提交视频任务，并在同一页面追踪状态、结果与请求日志。
+              标准 API / Agent Plan · 请求编辑 · 任务状态 · 脱敏日志
             </p>
             <div className="hero-actions">
               <a className="primary-action" href="#operations">
-                开始实操演示
+                开始配置
               </a>
               <a className="secondary-action" href="#sample">
-                查看官方示例
+                官方示例
               </a>
               <button
                 className="text-action"
                 onClick={() => selectView("templates")}
                 type="button"
               >
-                浏览模板资产库 →
+                模板资产库 →
               </button>
             </div>
           </div>
@@ -210,9 +321,8 @@ export function WorkspaceShell() {
             <div className="security-note">
               <span aria-hidden="true">✦</span>
               <p>
-                <strong>演示数据可恢复</strong>
-                最近 30
-                次任务保存在当前浏览器；刷新后仍可查看任务状态、结果入口和结构化日志。
+                <strong>本地记录</strong>
+                最近 30 次任务；含状态、结果与脱敏日志。
               </p>
             </div>
           </aside>
@@ -227,8 +337,7 @@ export function WorkspaceShell() {
               <h2>配置、审核、提交、追踪</h2>
             </div>
             <p>
-              表单与完整 API
-              请求详情双向联动。每次点击提交都会生成一条历史记录，并持续追加创建与状态查询日志。
+              表单 ↔ Request Body 双向联动；自动记录创建与状态查询日志。
             </p>
           </div>
           <SeedanceTaskRunner />
@@ -245,16 +354,49 @@ export function WorkspaceShell() {
 
       <div
         className="workspace-view"
+        data-active={view === "seedream"}
+        hidden={view !== "seedream"}
+      >
+        <SeedreamWorkbench />
+      </div>
+
+      <div
+        className="workspace-view"
         data-active={view === "managed-agents"}
         hidden={view !== "managed-agents"}
       >
         <ManagedAgentsWorkbench />
       </div>
 
+      <div
+        className="workspace-view"
+        data-active={view === "responses"}
+        hidden={view !== "responses"}
+      >
+        <ResponsesWorkbench />
+      </div>
+
+      <div
+        className="workspace-view"
+        data-active={view === "llm-trends"}
+        hidden={view !== "llm-trends"}
+      >
+        <LlmTrendsWorkbench />
+      </div>
+
+      <div
+        className="workspace-view"
+        data-active={view === "ai-coding"}
+        hidden={view !== "ai-coding"}
+      >
+        <AiCodingWorkbench />
+      </div>
+
       <footer>
         <p>火山方舟 API 演示与模板资产平台</p>
         <span>
-          Seedance · Managed Agents · 完整请求审核 · 历史与脱敏日志
+          Seedance · Seedream · Responses API · Managed Agents · LLM 趋势 · AI coding ·
+          完整请求审核 · 历史与脱敏日志
         </span>
       </footer>
     </main>
