@@ -16,6 +16,7 @@ import {
   type SeedanceRequestBody,
   type SeedanceSequencePlan,
 } from "../lib/seedance-examples";
+import { SaveToMaterialLibraryButton } from "./SaveToMaterialLibraryButton";
 import { APPLY_EXAMPLE_EVENT } from "./SeedanceExampleGallery";
 
 type TaskStatus =
@@ -1540,14 +1541,25 @@ export function SeedanceTaskRunner() {
         {resultVideoUrl && (
           <div className="result-card">
             <video src={resultVideoUrl} controls playsInline preload="metadata" />
-            <a href={resultVideoUrl} target="_blank" rel="noreferrer">
-              在新窗口打开结果视频 ↗
-            </a>
-            {resultLastFrameUrl && (
-              <a href={resultLastFrameUrl} target="_blank" rel="noreferrer">
-                打开返回的尾帧图 ↗
-              </a>
-            )}
+            <div className="result-card-actions">
+              <div>
+                <a href={resultVideoUrl} target="_blank" rel="noreferrer">
+                  在新窗口打开结果视频 ↗
+                </a>
+                {resultLastFrameUrl && (
+                  <a href={resultLastFrameUrl} target="_blank" rel="noreferrer">
+                    打开返回的尾帧图 ↗
+                  </a>
+                )}
+              </div>
+              <SaveToMaterialLibraryButton
+                kind="video"
+                name={`${selectedExampleTitle}-${taskId || activeHistoryId || "result"}.mp4`}
+                source="seedance"
+                sourceRef={`seedance:${taskId || activeHistoryId || resultVideoUrl}`}
+                sourceValue={resultVideoUrl}
+              />
+            </div>
           </div>
         )}
       </section>
@@ -1709,13 +1721,23 @@ export function SeedanceTaskRunner() {
                   <p className="history-error">{record.error}</p>
                 )}
                 {record.resultVideoUrl && (
-                  <a
-                    href={record.resultVideoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    打开结果视频 ↗
-                  </a>
+                  <div className="history-material-row">
+                    <a
+                      href={record.resultVideoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      打开结果视频 ↗
+                    </a>
+                    <SaveToMaterialLibraryButton
+                      compact
+                      kind="video"
+                      name={`${record.exampleTitle || "Seedance 生成视频"}-${record.taskId || record.id}.mp4`}
+                      source="seedance"
+                      sourceRef={`seedance:${record.taskId || record.id}`}
+                      sourceValue={record.resultVideoUrl}
+                    />
+                  </div>
                 )}
                 {record.resultLastFrameUrl && (
                   <a

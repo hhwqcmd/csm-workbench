@@ -1,5 +1,5 @@
 export type WorkspaceView =
-  | "workbench"
+  | "seedance"
   | "templates"
   | "seedream"
   | "managed-agents"

@@ -4,9 +4,9 @@
 
 本项目是火山方舟 API 演示与模板资产平台，包含七个平级顶层栏目：
 
-1. **演示工作台**：配置官方 API 或 Agent Plan、审核完整请求、创建异步任务，并查看结果、历史和请求/响应日志。
-2. **模板资产库**：浏览提示词、电商宣发、影视短剧和营销短视频模板，并将场景参数预填到同一个实操台。
-3. **Seedream 演示**：覆盖官方图片教程的十类非故事书示例，提供场景填写说明、Prompt 技巧、一键优化、完整 API 联动、结果、历史和脱敏日志。
+1. **模板资产库**：浏览提示词与场景模板，并以本机索引管理保存到私有 TOS 的视频、图片和音频素材。
+2. **Seedance**：配置官方 API 或 Agent Plan、审核完整请求、创建异步任务、查看结果/历史/日志，并显式保存成功视频到素材库。
+3. **Seedream**：覆盖官方图片教程的十类非故事书示例，提供 Prompt 优化、完整 API、结果、历史、日志和图片素材保存。
 4. **Responses API**：覆盖文本、多轮、推理、多模态、Function、内置工具、缓存与结构化输出，联动展示完整输入/输出协议、SSE、历史和脱敏日志。
 5. **Managed Agents**：创建或更新 Agent、配置 Agent 环境，并统一管理 Session 生命周期、事件流、文件挂载与持久化记忆。
 6. **LLM 趋势**：以日期快照展示 Seed、Seedance、Seedream 主力模型，并对比各厂商最新文本旗舰的价格、参数、编程、长程、Agent benchmark 与第三方榜单。
@@ -14,12 +14,14 @@
 
 官方 Python 快速示例作为协议和素材基线独立保留，不是产品页面主线。页面不得重新加入共学进度、环境安装步骤或教程路线。
 
-当前事实（最后核对：2026-07-29）：
+当前事实（最后核对：2026-08-05）：
 
 - 默认连接为标准官方 API + `doubao-seedance-2-0-mini-260615`，同时支持 Agent Plan 套餐通道。
 - 生产 Sites 项目使用 `.openai/hosting.json` 中既有 `project_id`，访问策略为公开直达。
 - 应用入口不要求登录；`app/chatgpt-auth.ts` 是未被引用的托管认证遗留代码，不得据此重新接回登录。
 - 任务历史和演示凭证只保存在当前浏览器，不是跨设备或服务端审计记录。
+- TOS 素材文件使用固定 `demo/` 前缀；素材索引只保存在当前浏览器，不使用 D1/R2，也不从 TOS 反向列举。
+- 生产站公开直达，素材保存与手动上传接口按已确认方案不做写鉴权；输入校验不能消除公开写入带来的存储、流量与滥用风险。
 
 ## 模块地图
 
@@ -40,7 +42,8 @@
 - `app/lib/seedance-server.ts`：服务端白名单校验、上游请求、响应归一化和错误脱敏。
 - `app/api/seedance/tasks/route.ts`、`status/route.ts`：创建与查询的同源服务端入口。
 - `app/lib/seedance-examples.ts`、`SeedanceExampleGallery.tsx`：八个官方示例及连续生成计划。
-- `app/lib/template-assets.ts`、`TemplateAssetLibrary.tsx`：四类模板、十个场景预填案例及复制/跳转交互。
+- `app/lib/template-assets.ts`、`TemplateAssetLibrary.tsx`：四类模板、十个场景预填案例，以及视频/图片/音频素材的本机索引、预览和手动上传。
+- `app/lib/material-assets.ts`、`app/lib/materials-server.ts`、`app/api/materials/`：素材元数据契约、本地存储、固定 TOS 配置、TOS4 签名、远程结果导入、文件上传和私有对象临时预览。
 - `app/globals.css`、`app/layout.tsx`：视觉规则、响应式布局和站点元数据。
 - `official-quickstart/`：官方 Python 基线；关键入口为 `python/demo_standard.py`。
 - `start_workbench.sh`：本地启动与环境检查，不安装依赖、不打开浏览器、不调用真实 API。
@@ -55,6 +58,8 @@
 `ManagedAgentsWorkbench → /api/managed-agents/* → managed-agents-server → 火山方舟 Managed Agents API`
 
 `ResponsesWorkbench → /api/responses → responses-server → 火山方舟 Responses API`
+
+`Seedance / Seedream / TemplateAssetLibrary → /api/materials/* → 私有 TOS demo/ → 浏览器本机素材索引`
 
 `official-quickstart → volcenginesdkarkruntime → 火山方舟 API`
 
@@ -119,6 +124,10 @@
 - 环境依赖包只开放 `apt`、`cargo`、`gem`、`go`、`npm`、`pip` 六类；`config.env` 键名不得使用 `ARK_` 或 `VOLC_` 保留前缀。`scope` 仅为兼容性预留，不应解释为已启用的隔离能力。
 - 环境不提供版本机制；需要修改定义时创建新环境并更新后续 Session 的 `environment_id`。每个 Session 仍拥有隔离沙箱和文件系统。
 - 模板缺少素材时用空 URL 表达并显示“素材待补”；所有 URL 补齐前执行按钮必须禁用。
+- TOS AK/SK 只能来自服务端环境变量；不得进入 `NEXT_PUBLIC_*`、浏览器、本机素材索引、源码、日志或错误响应。`.env.example` 只保留空凭证占位。
+- 素材接口只允许固定 bucket、北京 Region、bucket Endpoint 和 `demo/` 前缀；对象键不得包含路径穿越，远程结果必须是公网 HTTPS，重定向逐跳复验。
+- 图片、音频、视频默认分别限制为 20 MB、50 MB、200 MB；MIME 必须与素材类型匹配。自动化测试只使用模拟 TOS，不得真实上传。
+- 清空浏览器素材索引不会删除 TOS 对象；当前产品不提供删除、TOS 反向扫描、跨设备同步或账号级素材隔离。
 
 ## 地雷与遗留区域
 

@@ -28,6 +28,11 @@ async function request(path = "/", init) {
   );
 }
 
+function restoreEnv(name, value) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
 test("server-renders the Ark demonstration platform", async () => {
   const response = await request();
   assert.equal(response.status, 200);
@@ -39,15 +44,25 @@ test("server-renders the Ark demonstration platform", async () => {
     html,
     /property="og:image" content="http:\/\/localhost:3001\/og-llm-trends\.png"/,
   );
-  assert.match(html, /演示工作台/);
   assert.match(html, /模板资产库/);
-  assert.match(html, /Seedream 演示/);
+  assert.match(html, /Seedance/);
+  assert.match(html, /Seedream/);
   assert.match(html, /Managed Agents/);
   assert.match(html, /LLM 趋势/);
   assert.match(html, /AI coding/);
   assert.match(html, /顶级栏目/);
   assert.match(html, /全链路 API 演示控制台/);
   assert.equal((html.match(/data-short-label=/g) ?? []).length, 7);
+  assert.ok(
+    html.indexOf('data-testid="workspace-templates"') <
+      html.indexOf('data-testid="workspace-seedance"'),
+    "the template library should be the first top-level studio",
+  );
+  assert.ok(
+    html.indexOf('data-testid="workspace-seedance"') <
+      html.indexOf('data-testid="workspace-seedream"'),
+    "Seedance should appear before Seedream",
+  );
   assert.ok(
     html.indexOf('data-testid="workspace-responses"') <
       html.indexOf('data-testid="workspace-managed-agents"'),
@@ -797,6 +812,32 @@ test("server-renders the four-category template asset library", async () => {
   assert.match(html, /8 秒/);
   assert.match(html, /工作台预置案例/);
   assert.match(html, /火山方舟提示词指南/);
+  assert.match(html, /模板与素材/);
+  assert.match(html, /asset-section-templates/);
+  assert.match(html, /asset-section-materials/);
+});
+
+test("keeps material library metadata local and exposes three preview types", async () => {
+  const librarySource = await readFile(
+    new URL("../app/components/TemplateAssetLibrary.tsx", import.meta.url),
+    "utf8",
+  );
+  const materialSource = await readFile(
+    new URL("../app/lib/material-assets.ts", import.meta.url),
+    "utf8",
+  );
+
+  for (const kind of ["video", "image", "audio"]) {
+    assert.match(librarySource, new RegExp(`id: "${kind}"`));
+    assert.match(librarySource, new RegExp(`material-kind-\\$\\{kind\\.id\\}`));
+  }
+  assert.match(librarySource, /uploadManualMaterial/);
+  assert.match(librarySource, /<video controls/);
+  assert.match(librarySource, /<audio controls/);
+  assert.match(librarySource, /<img alt=/);
+  assert.match(materialSource, /template-material-library:v1/);
+  assert.match(materialSource, /window\.localStorage/);
+  assert.doesNotMatch(materialSource, /sourceValue.*localStorage/s);
 });
 
 test("keeps template application on the existing task runner path", async () => {
@@ -810,7 +851,7 @@ test("keeps template application on the existing task runner path", async () => 
   );
 
   assert.match(librarySource, /APPLY_EXAMPLE_EVENT/);
-  assert.match(librarySource, /navigateWorkspace\("workbench"\)/);
+  assert.match(librarySource, /navigateWorkspace\("seedance"\)/);
   assert.doesNotMatch(librarySource, /fetch\(/);
   assert.equal((assetSource.match(/runnableExample:/g) ?? []).length, 10);
   assert.match(assetSource, /template-commerce-cloud-cream/);
@@ -834,6 +875,205 @@ test("does not embed an API key in server HTML or the example environment", asyn
   assert.doesNotMatch(html, /NEXT_PUBLIC_(?:ARK|AGENT)_API_KEY/);
   assert.match(envExample, /^AGENT_API_KEY=$/m);
   assert.doesNotMatch(envExample, /^AGENT_API_KEY=.+$/m);
+  assert.match(envExample, /^VOLC_ACCESS_KEY=$/m);
+  assert.match(envExample, /^VOLC_SECRET_KEY=$/m);
+  assert.doesNotMatch(envExample, /^VOLC_(?:ACCESS|SECRET)_KEY=.+$/m);
+});
+
+test("imports, uploads, and previews private TOS materials through signed routes", async () => {
+  const originalFetch = globalThis.fetch;
+  const previous = {
+    access: process.env.VOLC_ACCESS_KEY,
+    secret: process.env.VOLC_SECRET_KEY,
+    bucket: process.env.TOS_BUCKET,
+    endpoint: process.env.TOS_ENDPOINT,
+    region: process.env.TOS_REGION,
+    prefix: process.env.TOS_PREFIX,
+  };
+  process.env.VOLC_ACCESS_KEY = "test-access-key-not-real";
+  process.env.VOLC_SECRET_KEY = "test-secret-key-not-real";
+  process.env.TOS_BUCKET = "hh-tos-test";
+  process.env.TOS_ENDPOINT = "https://hh-tos-test.tos-cn-beijing.volces.com";
+  process.env.TOS_REGION = "cn-beijing";
+  process.env.TOS_PREFIX = "demo/";
+  const upstreamRequests = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    upstreamRequests.push({ url, init });
+    if (url === "https://generated.example.com/image.png") {
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        headers: { "content-type": "image/png", "content-length": "4" },
+      });
+    }
+    assert.match(url, /^https:\/\/hh-tos-test\.tos-cn-beijing\.volces\.com\/demo\//);
+    assert.match(url, /X-Tos-Algorithm=TOS4-HMAC-SHA256/);
+    assert.match(url, /X-Tos-Content-Sha256=UNSIGNED-PAYLOAD/);
+    assert.match(url, /X-Tos-Signature=[a-f0-9]{64}/);
+    assert.equal(init.method, "PUT");
+    return new Response(null, { status: 200 });
+  };
+
+  try {
+    const imported = await request("/api/materials/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "image",
+        source: "seedream",
+        sourceRef: "seedream:test-run:0",
+        sourceValue: "https://generated.example.com/image.png",
+        name: "测试图片.png",
+      }),
+    });
+    assert.equal(imported.status, 201);
+    const importedAsset = await imported.json();
+    assert.equal(importedAsset.kind, "image");
+    assert.equal(importedAsset.source, "seedream");
+    assert.equal(importedAsset.size, 4);
+    assert.match(importedAsset.objectKey, /^demo\/image\/generated\/[a-f0-9]{64}\.png$/);
+    assert.equal("sourceValue" in importedAsset, false);
+
+    const uploaded = await request(
+      "/api/materials/upload?kind=audio&name=folder%5Csample.mp3",
+      {
+        method: "POST",
+        headers: { "content-type": "audio/mpeg", "content-length": "4" },
+        body: new Uint8Array([73, 68, 51, 4]),
+      },
+    );
+    assert.equal(uploaded.status, 201);
+    const uploadedAsset = await uploaded.json();
+    assert.equal(uploadedAsset.kind, "audio");
+    assert.equal(uploadedAsset.size, 4);
+    assert.match(
+      uploadedAsset.objectKey,
+      /^demo\/audio\/uploads\/\d{8}\/[a-f0-9-]+-folder-sample\.mp3$/,
+    );
+
+    const preview = await request(
+      `/api/materials/object?key=${encodeURIComponent(importedAsset.objectKey)}`,
+    );
+    assert.equal(preview.status, 302);
+    assert.match(
+      preview.headers.get("location") ?? "",
+      /X-Tos-Expires=3600.*X-Tos-Signature=/,
+    );
+    assert.equal(preview.headers.get("cache-control"), "no-store");
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv("VOLC_ACCESS_KEY", previous.access);
+    restoreEnv("VOLC_SECRET_KEY", previous.secret);
+    restoreEnv("TOS_BUCKET", previous.bucket);
+    restoreEnv("TOS_ENDPOINT", previous.endpoint);
+    restoreEnv("TOS_REGION", previous.region);
+    restoreEnv("TOS_PREFIX", previous.prefix);
+  }
+});
+
+test("rejects unsafe material inputs before writing to TOS", async () => {
+  const originalFetch = globalThis.fetch;
+  const previousAccess = process.env.VOLC_ACCESS_KEY;
+  const previousSecret = process.env.VOLC_SECRET_KEY;
+  process.env.VOLC_ACCESS_KEY = "test-access-key-not-real";
+  process.env.VOLC_SECRET_KEY = "test-secret-key-not-real";
+  globalThis.fetch = async () =>
+    new Response(null, {
+      status: 302,
+      headers: { location: "https://127.0.0.1/redirected.png" },
+    });
+  try {
+    const privateImport = await request("/api/materials/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "image",
+        source: "seedream",
+        sourceRef: "unsafe",
+        sourceValue: "https://127.0.0.1/private.png",
+        name: "private.png",
+      }),
+    });
+    assert.equal(privateImport.status, 400);
+    assert.match(await privateImport.text(), /公网 HTTPS URL/);
+
+    const privateRedirect = await request("/api/materials/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "image",
+        source: "seedream",
+        sourceRef: "unsafe-redirect",
+        sourceValue: "https://generated.example.com/redirect.png",
+        name: "redirect.png",
+      }),
+    });
+    assert.equal(privateRedirect.status, 400);
+    assert.match(await privateRedirect.text(), /公网 HTTPS URL/);
+
+    const wrongMime = await request(
+      "/api/materials/upload?kind=image&name=wrong.png",
+      {
+        method: "POST",
+        headers: { "content-type": "audio/mpeg" },
+        body: new Uint8Array([1]),
+      },
+    );
+    assert.equal(wrongMime.status, 400);
+    assert.match(await wrongMime.text(), /MIME/);
+
+    const spoofedMime = await request(
+      "/api/materials/upload?kind=image&name=spoofed.png",
+      {
+        method: "POST",
+        headers: { "content-type": "image/png" },
+        body: new Uint8Array([1, 2, 3, 4]),
+      },
+    );
+    assert.equal(spoofedMime.status, 400);
+    assert.match(await spoofedMime.text(), /文件内容.*MIME/);
+
+    const oversized = await request(
+      "/api/materials/upload?kind=image&name=oversized.png",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "image/png",
+          "content-length": String(20 * 1024 * 1024 + 1),
+        },
+        body: new Uint8Array([137, 80, 78, 71]),
+      },
+    );
+    assert.equal(oversized.status, 400);
+    assert.match(await oversized.text(), /20 MB/);
+
+    const traversal = await request(
+      `/api/materials/object?key=${encodeURIComponent("demo/../secret.txt")}`,
+    );
+    assert.equal(traversal.status, 400);
+    assert.match(await traversal.text(), /demo\//);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv("VOLC_ACCESS_KEY", previousAccess);
+    restoreEnv("VOLC_SECRET_KEY", previousSecret);
+  }
+});
+
+test("fails closed when TOS server credentials are missing", async () => {
+  const previousAccess = process.env.VOLC_ACCESS_KEY;
+  const previousSecret = process.env.VOLC_SECRET_KEY;
+  delete process.env.VOLC_ACCESS_KEY;
+  delete process.env.VOLC_SECRET_KEY;
+  try {
+    const response = await request(
+      `/api/materials/object?key=${encodeURIComponent("demo/image/generated/test.png")}`,
+    );
+    assert.equal(response.status, 502);
+    assert.match(await response.text(), /服务端凭证未配置/);
+  } finally {
+    restoreEnv("VOLC_ACCESS_KEY", previousAccess);
+    restoreEnv("VOLC_SECRET_KEY", previousSecret);
+  }
 });
 
 test("persists task logs and repeats polling while a task remains active", async () => {

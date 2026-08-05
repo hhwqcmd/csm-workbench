@@ -20,9 +20,9 @@ const WORKSPACE_VIEWS: Array<{
   label: string;
   shortLabel: string;
 }> = [
-  { id: "workbench", index: "01", label: "演示工作台", shortLabel: "视频" },
-  { id: "templates", index: "02", label: "模板资产库", shortLabel: "模板" },
-  { id: "seedream", index: "03", label: "Seedream 演示", shortLabel: "图片" },
+  { id: "templates", index: "01", label: "模板资产库", shortLabel: "模板" },
+  { id: "seedance", index: "02", label: "Seedance", shortLabel: "视频" },
+  { id: "seedream", index: "03", label: "Seedream", shortLabel: "图片" },
   { id: "responses", index: "04", label: "Responses API", shortLabel: "Resp." },
   {
     id: "managed-agents",
@@ -46,7 +46,19 @@ const WORKSPACE_VIEWS: Array<{
 
 function viewFromHash(): WorkspaceView {
   const hash = window.location.hash;
-  if (window.location.hash.startsWith("#templates")) return "templates";
+  if (
+    window.location.hash.startsWith("#templates") ||
+    window.location.hash.startsWith("#materials")
+  ) {
+    return "templates";
+  }
+  if (
+    ["#seedance", "#top", "#sample", "#operations"].some((anchor) =>
+      hash.startsWith(anchor),
+    )
+  ) {
+    return "seedance";
+  }
   if (window.location.hash.startsWith("#seedream")) return "seedream";
   if (window.location.hash.startsWith("#managed-agents")) {
     return "managed-agents";
@@ -74,11 +86,11 @@ function viewFromHash(): WorkspaceView {
   ) {
     return "ai-coding";
   }
-  return "workbench";
+  return "templates";
 }
 
 export function WorkspaceShell() {
-  const [view, setView] = useState<WorkspaceView>("workbench");
+  const [view, setView] = useState<WorkspaceView>("templates");
 
   useEffect(() => {
     function syncHash() {
@@ -97,7 +109,7 @@ export function WorkspaceShell() {
     function handleNavigate(event: Event) {
       const nextView = (event as CustomEvent<WorkspaceView>).detail;
       if (
-        nextView !== "workbench" &&
+        nextView !== "seedance" &&
         nextView !== "templates" &&
         nextView !== "seedream" &&
         nextView !== "managed-agents" &&
@@ -169,6 +181,8 @@ export function WorkspaceShell() {
     const nextHash =
       nextView === "templates"
         ? "#templates"
+        : nextView === "seedance"
+          ? "#seedance"
         : nextView === "seedream"
           ? "#seedream"
           : nextView === "managed-agents"
@@ -192,9 +206,9 @@ export function WorkspaceShell() {
       <header className="topbar">
         <button
           className="brand brand-button"
-          onClick={() => selectView("workbench")}
+          onClick={() => selectView("templates")}
           type="button"
-          aria-label="返回演示工作台顶部"
+          aria-label="返回模板资产库顶部"
         >
           <span className="brand-mark">ARK</span>
           <span>
@@ -226,7 +240,7 @@ export function WorkspaceShell() {
             <small>/ 07</small>
           </span>
           <span className="local-badge">本地演示模式</span>
-          {view === "workbench" && (
+          {view === "seedance" && (
             <>
               <a className="topbar-anchor" href="#sample">
                 官方示例
@@ -264,8 +278,8 @@ export function WorkspaceShell() {
 
       <div
         className="workspace-view"
-        data-active={view === "workbench"}
-        hidden={view !== "workbench"}
+        data-active={view === "seedance"}
+        hidden={view !== "seedance"}
       >
         <section className="hero demo-hero" id="top">
           <div className="hero-copy">

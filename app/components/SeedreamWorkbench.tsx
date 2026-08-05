@@ -10,6 +10,12 @@ import {
   type SeedreamExample,
   type SeedreamRequestBody,
 } from "../lib/seedream-examples";
+import {
+  hasSavedMaterial,
+  importGeneratedMaterial,
+  readMaterialAssets,
+} from "../lib/material-assets";
+import { SaveToMaterialLibraryButton } from "./SaveToMaterialLibraryButton";
 
 type ResultImage = {
   url: string;
@@ -70,6 +76,11 @@ export function SeedreamWorkbench() {
   >("idle");
   const [error, setError] = useState("");
   const [images, setImages] = useState<ResultImage[]>([]);
+  const [activeGenerationId, setActiveGenerationId] = useState("");
+  const [bulkSaveState, setBulkSaveState] = useState<
+    "idle" | "saving" | "saved" | "failed"
+  >("idle");
+  const [bulkSaveError, setBulkSaveError] = useState("");
   const [latestResponse, setLatestResponse] = useState<unknown>();
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [selectedLogId, setSelectedLogId] = useState("");
@@ -122,6 +133,9 @@ export function SeedreamWorkbench() {
     setStatus("idle");
     setError("");
     setImages([]);
+    setActiveGenerationId("");
+    setBulkSaveState("idle");
+    setBulkSaveError("");
     setLatestResponse(undefined);
     window.history.replaceState(null, "", `#seedream-${example.id}`);
     window.setTimeout(() => {
@@ -310,6 +324,9 @@ export function SeedreamWorkbench() {
       request: logRequest,
     };
     upsertHistory(record);
+    setActiveGenerationId(historyId);
+    setBulkSaveState("idle");
+    setBulkSaveError("");
     setStatus("generating");
     setError("");
     setImages([]);
@@ -377,6 +394,33 @@ export function SeedreamWorkbench() {
     setHistory((current) =>
       current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
     );
+  }
+
+  async function saveAllImages() {
+    if (!images.length || !activeGenerationId || bulkSaveState === "saving") {
+      return;
+    }
+    setBulkSaveState("saving");
+    setBulkSaveError("");
+    try {
+      for (const [index, image] of images.entries()) {
+        const sourceRef = `seedream:${activeGenerationId}:${index}`;
+        if (hasSavedMaterial(readMaterialAssets(), "image", sourceRef)) continue;
+        await importGeneratedMaterial({
+          kind: "image",
+          source: "seedream",
+          sourceRef,
+          sourceValue: image.url,
+          name: `${selectedExample.title}-${String(index + 1).padStart(2, "0")}.png`,
+        });
+      }
+      setBulkSaveState("saved");
+    } catch (saveError) {
+      setBulkSaveState("failed");
+      setBulkSaveError(
+        saveError instanceof Error ? saveError.message : "批量保存图片失败。",
+      );
+    }
   }
 
   return (
@@ -814,8 +858,26 @@ export function SeedreamWorkbench() {
             <p className="eyebrow">生成结果</p>
             <h2>图片预览</h2>
           </div>
-          <span>{images.length ? `${images.length} 张` : "等待执行"}</span>
+          <div className="seedream-result-actions">
+            <span>{images.length ? `${images.length} 张` : "等待执行"}</span>
+            {images.length > 1 && activeGenerationId && (
+              <button
+                disabled={bulkSaveState === "saving" || bulkSaveState === "saved"}
+                onClick={() => void saveAllImages()}
+                type="button"
+              >
+                {bulkSaveState === "saving"
+                  ? "保存中…"
+                  : bulkSaveState === "saved"
+                    ? "已全部保存"
+                    : bulkSaveState === "failed"
+                      ? "重试全部保存"
+                      : "全部保存到素材库"}
+              </button>
+            )}
+          </div>
         </header>
+        {bulkSaveError && <p className="seedream-save-error">{bulkSaveError}</p>}
         {images.length ? (
           <div className="seedream-result-grid">
             {images.map((image, index) => (
@@ -826,12 +888,24 @@ export function SeedreamWorkbench() {
                   src={image.url}
                 />
                 <footer>
-                  <span>IMAGE {String(index + 1).padStart(2, "0")}</span>
-                  {image.size && <small>{image.size}</small>}
-                  {!image.url.startsWith("data:") && (
-                    <a href={image.url} target="_blank" rel="noreferrer">
-                      打开原图 ↗
-                    </a>
+                  <div>
+                    <span>IMAGE {String(index + 1).padStart(2, "0")}</span>
+                    {image.size && <small>{image.size}</small>}
+                    {!image.url.startsWith("data:") && (
+                      <a href={image.url} target="_blank" rel="noreferrer">
+                        打开原图 ↗
+                      </a>
+                    )}
+                  </div>
+                  {activeGenerationId && (
+                    <SaveToMaterialLibraryButton
+                      compact
+                      kind="image"
+                      name={`${selectedExample.title}-${String(index + 1).padStart(2, "0")}.png`}
+                      source="seedream"
+                      sourceRef={`seedream:${activeGenerationId}:${index}`}
+                      sourceValue={image.url}
+                    />
                   )}
                 </footer>
               </article>
