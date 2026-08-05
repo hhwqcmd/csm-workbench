@@ -949,6 +949,7 @@ test("imports, uploads, and previews private TOS materials through signed routes
     assert.match(url, /X-Tos-Content-Sha256=UNSIGNED-PAYLOAD/);
     assert.match(url, /X-Tos-Signature=[a-f0-9]{64}/);
     assert.equal(init.method, "PUT");
+    assert.equal(init.redirect, "manual");
     return new Response(null, { status: 200 });
   };
 

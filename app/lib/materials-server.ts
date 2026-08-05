@@ -268,13 +268,19 @@ async function putObject(
       method: "PUT",
       headers: { "content-type": contentType },
       body,
-      redirect: "error",
+      // Cloudflare Workers does not implement redirect: "error". Manual mode
+      // preserves the same fail-closed behavior without throwing before the
+      // request can be sent.
+      redirect: "manual",
       signal: AbortSignal.timeout(300_000),
     });
   } catch {
     throw new MaterialsServiceError(
       "TOS 上传请求未能发送，请稍后重试或联系管理员检查运行环境网络。",
     );
+  }
+  if (response.status >= 300 && response.status < 400) {
+    throw new MaterialsServiceError("TOS 上传发生重定向，已阻止继续请求。");
   }
   if (!response.ok) {
     const requestId = response.headers.get("x-tos-request-id");
