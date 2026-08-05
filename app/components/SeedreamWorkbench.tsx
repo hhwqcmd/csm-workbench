@@ -152,6 +152,12 @@ export function SeedreamWorkbench() {
     setError("");
   }
 
+  function focusApiKey() {
+    const input = document.getElementById("seedream-api-key");
+    input?.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => input?.focus(), 250);
+  }
+
   function setImageText(value: string) {
     const urls = value
       .split("\n")
@@ -517,6 +523,7 @@ export function SeedreamWorkbench() {
                 <span>API Key</span>
                 <input
                   autoComplete="off"
+                  id="seedream-api-key"
                   onChange={(event) => setApiKey(event.target.value)}
                   placeholder="填入普通方舟 API Key"
                   type="password"
@@ -571,16 +578,16 @@ export function SeedreamWorkbench() {
                     value={requestBody.prompt}
                   />
                   <button
-                    disabled={
-                      active ||
-                      !apiKey.trim() ||
-                      !requestBody.prompt.trim()
+                    disabled={active || !requestBody.prompt.trim()}
+                    onClick={() =>
+                      apiKey.trim() ? void optimizePrompt() : focusApiKey()
                     }
-                    onClick={() => void optimizePrompt()}
                     type="button"
                   >
                     {status === "optimizing"
                       ? "优化中…"
+                      : !apiKey.trim()
+                        ? "先填写 API Key 后优化"
                       : `✦ 用 ${SEEDREAM_PROMPT_MODEL} 优化`}
                   </button>
                 </div>
@@ -1001,7 +1008,9 @@ function maskApiKey(value: string): string {
 
 function maskedHeaders(apiKey: string): Record<string, string> {
   return {
-    authorization: `Bearer ${maskApiKey(apiKey)}`,
+    authorization: apiKey.trim()
+      ? `Bearer ${maskApiKey(apiKey)}`
+      : "Bearer 未填写",
     "content-type": "application/json",
   };
 }

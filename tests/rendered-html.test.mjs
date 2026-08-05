@@ -565,9 +565,13 @@ test("keeps Seedream prompt optimization explicit, masked, and locally logged", 
 
   assert.match(source, /\/api\/seedream\/optimize-prompt/);
   assert.match(source, /\/api\/seedream\/generate/);
+  assert.match(source, /先填写 API Key 后优化/);
+  assert.match(source, /Bearer 未填写/);
+  assert.match(source, /focusApiKey/);
   assert.match(source, /seedance-workbench:demo-credentials:v1/);
   assert.match(source, /seedream-workbench:history:v1/);
-  assert.match(source, /authorization: `Bearer \$\{maskApiKey\(apiKey\)\}`/);
+  assert.match(source, /apiKey\.trim\(\)/);
+  assert.match(source, /`Bearer \$\{maskApiKey\(apiKey\)\}`/);
   assert.match(source, /costConfirmed/);
   assert.match(source, /applyApiDraft/);
   assert.match(source, /consumeSeedreamStream/);
