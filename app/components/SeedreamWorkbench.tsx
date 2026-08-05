@@ -502,11 +502,7 @@ export function SeedreamWorkbench() {
         method: "POST",
         headers: { "content-type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({
-          action: "create",
-          apiKey,
-          requestBody: submittedBody,
-        }),
+        body: JSON.stringify({ action: "create" }),
       });
       const payload = (await response.json()) as {
         jobId?: string;
@@ -527,6 +523,31 @@ export function SeedreamWorkbench() {
       };
       if (!writePendingSeedreamJob(pendingJob)) {
         setError("浏览器无法保存任务恢复凭证，请保持页面打开直到本次生成完成。");
+      }
+      let runResponse: Response;
+      try {
+        runResponse = await fetch("/api/seedream/jobs", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({
+            action: "run",
+            jobId: pendingJob.jobId,
+            resumeToken: pendingJob.resumeToken,
+            apiKey,
+            requestBody: submittedBody,
+          }),
+        });
+      } catch {
+        setError("生成连接已中断，正在查询服务端任务状态。");
+        await pollSeedreamJob(pendingJob);
+        return;
+      }
+      const runPayload =
+        (await runResponse.json()) as SeedreamJobStatusResponse;
+      if (!runResponse.ok) {
+        clearPendingSeedreamJob(pendingJob.jobId);
+        throw new Error(runPayload.error ?? "图片生成失败。");
       }
       await pollSeedreamJob(pendingJob);
     } catch (generateError) {

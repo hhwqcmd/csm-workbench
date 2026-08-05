@@ -97,7 +97,7 @@ AI coding 路径
 6. 查询并归一化任务状态。
 7. 对错误进行安全脱敏，避免返回 Secret 或内部日志。
 8. Managed Agents 校验 Agent 创建/版本化更新的完整字段、Skills/Tools/MCP/Multi Agent 约束，以及云环境、Session、事件、文件资源与 Memory Store/Memory 结构；事件流必须先建立上游 SSE，再发送用户事件。
-9. Seedream 校验 Pro/Lite 模型能力、图片公网地址、输入数量、尺寸、组图、联网、流式与图片 API Prompt 优化参数；真实生成在费用确认后创建后台任务，D1 只保存 24 小时状态、URL 结果和脱敏错误，API Key、Prompt、参考图与完整请求只存在于本次请求和后台执行闭包；Prompt 一键优化只使用服务端内置场景技巧调用 `doubao-seed-evolving`。
+9. Seedream 校验 Pro/Lite 模型能力、图片公网地址、输入数量、尺寸、组图、联网、流式与图片 API Prompt 优化参数；真实生成先创建可恢复任务并把匿名令牌写入浏览器，再由独立 `run` 请求执行长调用，D1 只保存 24 小时状态、URL 结果和脱敏错误，API Key、Prompt、参考图与完整请求只存在于执行请求内存；Prompt 一键优化只使用服务端内置场景技巧调用 `doubao-seed-evolving`。
 10. Responses API 校验完整顶层字段、InputItem 素材 URL、工具必填项、缓存互斥和生命周期 ID；同步 JSON 与 SSE 均在返回浏览器前执行凭证脱敏。
 11. 素材接口固定 TOS bucket、Endpoint、Region 与 `demo/` 前缀，校验 MIME、大小、对象键和公网 HTTPS 重定向；图片在校验后以不超过 20 MB 的固定长度二进制请求体上传，视频和音频保持限流流式上传；TOS AK/SK 只用于服务端签名，不进入浏览器或错误响应。
 

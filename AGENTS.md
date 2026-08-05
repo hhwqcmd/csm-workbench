@@ -102,7 +102,7 @@
 - Seedream 默认使用 `doubao-seedream-5-0-pro-260628`；组图、联网和流式按官方能力限制使用 Lite。Prompt 一键优化固定调用 `doubao-seed-evolving`，不能与图片 API 的 `optimize_prompt_options` 混为一谈。
 - Seedream 图片只允许公网 HTTPS URL 或受控图片 Base64；Pro 最多 10 张参考图，Lite 最多 14 张，组图输入与输出合计最多 15 张。故事书/连环画附录不进入产品。
 - Seedream 真实图片生成必须费用确认；Prompt 优化只在显式点击时调用。页面加载、示例切换、构建与自动化测试不得产生真实调用。
-- Seedream 生成使用服务端后台任务；浏览器仅本地保存恢复令牌，D1 只保留任务状态、URL 格式结果与脱敏错误 24 小时。不得把 API Key、Prompt、参考图或完整请求写入 D1；`b64_json` 不进入可恢复任务。
+- Seedream 生成先创建任务并保存恢复令牌，再由独立 `run` 请求执行长调用；D1 只保留任务状态、URL 格式结果与脱敏错误 24 小时。不得把 API Key、Prompt、参考图或完整请求写入 D1；`b64_json` 不进入可恢复任务。
 - Responses API 只使用标准 `https://ark.cn-beijing.volces.com/api/v3` 与普通方舟 Key。所有创建、查询、Input Items 和删除操作必须经同源 POST，不能开放任意 Base URL。
 - AI coding 栏目只使用仓库内模拟组织与指标数据；同源 GET 接口不得接入员工身份、真实代码内容、会话 Prompt、凭证或生产效能平台。页面不得把模拟数据表述为真实客户成效。
 - Responses 创建必须费用确认，永久删除必须不可逆确认；缓存要求 `store=true`，前缀缓存还要求 `stream=false`，且缓存不能与非 Function 内置工具混用。

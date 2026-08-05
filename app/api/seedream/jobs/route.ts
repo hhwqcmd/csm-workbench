@@ -1,6 +1,7 @@
 import {
   createSeedreamJob,
   getSeedreamJob,
+  runSeedreamJob,
 } from "../../../lib/seedream-jobs-server";
 import { SeedreamValidationError } from "../../../lib/seedream-server";
 
@@ -16,6 +17,13 @@ export async function POST(request: Request): Promise<Response> {
         headers: { "cache-control": "no-store" },
       });
     }
+    if (action === "run") {
+      const { action: _action, ...input } = value;
+      void _action;
+      return Response.json(await runSeedreamJob(input), {
+        headers: { "cache-control": "no-store" },
+      });
+    }
     if (action === "status") {
       const { action: _action, ...input } = value;
       void _action;
@@ -23,7 +31,7 @@ export async function POST(request: Request): Promise<Response> {
         headers: { "cache-control": "no-store" },
       });
     }
-    throw new SeedreamValidationError("任务 action 只支持 create 或 status。");
+    throw new SeedreamValidationError("任务 action 只支持 create、run 或 status。");
   } catch (error) {
     const validation = error instanceof SeedreamValidationError;
     return Response.json(

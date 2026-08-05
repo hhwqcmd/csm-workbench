@@ -602,11 +602,15 @@ test("keeps Seedream generation recoverable without persisting credentials", asy
   assert.equal(hosting.d1, "DB");
   assert.match(schema, /CREATE TABLE `seedream_jobs`/);
   assert.match(schema, /`resume_token_hash` text NOT NULL/);
-  assert.match(jobSource, /after\(\(\) => runSeedreamJob/);
+  assert.match(jobSource, /status = 'running'/);
+  assert.match(jobSource, /status = 'pending'/);
+  assert.match(jobSource, /executeSeedreamJob/);
   assert.match(jobSource, /JOB_TTL_SECONDS = 24 \* 60 \* 60/);
   assert.match(jobSource, /response_format=url/);
   assert.match(routeSource, /createSeedreamJob/);
+  assert.match(routeSource, /runSeedreamJob/);
   assert.match(routeSource, /getSeedreamJob/);
+  assert.doesNotMatch(jobSource, /\bafter\(/);
   assert.doesNotMatch(schema, /api_key|prompt|request_json/i);
 });
 

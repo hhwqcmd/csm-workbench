@@ -1,6 +1,5 @@
 import "server-only";
 
-import { after } from "next/server";
 import {
   parseGenerateSeedreamInput,
   proxySeedreamGeneration,
@@ -14,18 +13,16 @@ type SeedreamJobRow = {
   status: JobStatus;
   response_json: string | null;
   error: string | null;
+  updated_at: number;
 };
 
 const JOB_TTL_SECONDS = 24 * 60 * 60;
 const MAX_RESULT_BYTES = 1_500_000;
+const PENDING_START_TIMEOUT_SECONDS = 2 * 60;
+const RUNNING_TIMEOUT_SECONDS = 15 * 60;
 
 export async function createSeedreamJob(value: unknown) {
-  const input = parseGenerateSeedreamInput(value);
-  if (input.requestBody.response_format === "b64_json") {
-    throw new SeedreamValidationError(
-      "支持刷新恢复的后台任务需要 response_format=url；Base64 结果过大，无法安全写入任务状态。",
-    );
-  }
+  exactRecord(value, []);
   const database = await databaseBinding();
   const jobId = crypto.randomUUID();
   const resumeToken = randomToken();
@@ -39,25 +36,79 @@ export async function createSeedreamJob(value: unknown) {
     )
     .bind(jobId, tokenHash, now, now, now + JOB_TTL_SECONDS)
     .run();
-  after(() => runSeedreamJob(jobId, input));
-  void cleanupExpiredJobs(database, now);
+  await cleanupExpiredJobs(database, now);
   return { jobId, resumeToken, status: "pending" as const };
+}
+
+export async function runSeedreamJob(value: unknown) {
+  const record = exactRecord(value, [
+    "jobId",
+    "resumeToken",
+    "apiKey",
+    "requestBody",
+  ]);
+  const jobId = requiredString(record.jobId, "任务 ID", 80);
+  const resumeToken = requiredString(record.resumeToken, "恢复令牌", 200);
+  const input = parseGenerateSeedreamInput({
+    apiKey: record.apiKey,
+    requestBody: record.requestBody,
+  });
+  if (input.requestBody.response_format === "b64_json") {
+    throw new SeedreamValidationError(
+      "支持刷新恢复的后台任务需要 response_format=url；Base64 结果过大，无法安全写入任务状态。",
+    );
+  }
+  const database = await databaseBinding();
+  const now = Math.floor(Date.now() / 1_000);
+  const claimed = await database
+    .prepare(
+      `UPDATE seedream_jobs
+       SET status = 'running', updated_at = ?
+       WHERE id = ? AND resume_token_hash = ? AND status = 'pending' AND expires_at > ?`,
+    )
+    .bind(now, jobId, await sha256Hex(resumeToken), now)
+    .run();
+  if ((claimed.meta.changes ?? 0) === 0) {
+    return getSeedreamJob({ jobId, resumeToken });
+  }
+  await executeSeedreamJob(jobId, input, database);
+  return getSeedreamJob({ jobId, resumeToken });
 }
 
 export async function getSeedreamJob(value: unknown) {
   const input = exactRecord(value, ["jobId", "resumeToken"]);
   const jobId = requiredString(input.jobId, "任务 ID", 80);
   const resumeToken = requiredString(input.resumeToken, "恢复令牌", 200);
-  const row = await (await databaseBinding())
+  const database = await databaseBinding();
+  const now = Math.floor(Date.now() / 1_000);
+  const row = await database
     .prepare(
-      `SELECT status, response_json, error
+      `SELECT status, response_json, error, updated_at
        FROM seedream_jobs
        WHERE id = ? AND resume_token_hash = ? AND expires_at > ?`,
     )
-    .bind(jobId, await sha256Hex(resumeToken), Math.floor(Date.now() / 1_000))
+    .bind(jobId, await sha256Hex(resumeToken), now)
     .first<SeedreamJobRow>();
   if (!row) {
     throw new SeedreamValidationError("任务不存在、已过期或恢复令牌不正确。");
+  }
+  const timedOut =
+    (row.status === "pending" &&
+      now - row.updated_at > PENDING_START_TIMEOUT_SECONDS) ||
+    (row.status === "running" &&
+      now - row.updated_at > RUNNING_TIMEOUT_SECONDS);
+  if (timedOut) {
+    row.status = "failed";
+    row.error =
+      "图片生成连接已超时，任务结果无法继续恢复；再次生成前请先确认上游没有返回结果。";
+    await database
+      .prepare(
+        `UPDATE seedream_jobs
+         SET status = 'failed', error = ?, updated_at = ?
+         WHERE id = ? AND status IN ('pending', 'running')`,
+      )
+      .bind(row.error, now, jobId)
+      .run();
   }
   if (row.status === "succeeded") {
     return {
@@ -68,14 +119,13 @@ export async function getSeedreamJob(value: unknown) {
   return { status: row.status, ...(row.error ? { error: row.error } : {}) };
 }
 
-async function runSeedreamJob(jobId: string, input: GenerateSeedreamInput) {
-  const database = await databaseBinding();
+async function executeSeedreamJob(
+  jobId: string,
+  input: GenerateSeedreamInput,
+  database: D1Database,
+) {
   const now = () => Math.floor(Date.now() / 1_000);
   try {
-    await database
-      .prepare("UPDATE seedream_jobs SET status = 'running', updated_at = ? WHERE id = ?")
-      .bind(now(), jobId)
-      .run();
     const response = await proxySeedreamGeneration(input);
     const result = input.requestBody.stream
       ? { events: parseSse(await response.text()) }

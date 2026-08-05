@@ -39,6 +39,8 @@ SeedreamWorkbench
   → POST /api/seedream/jobs action=create
   → app/lib/seedream-jobs-server.ts
   → D1 记录匿名任务 ID、恢复令牌哈希和 24 小时状态
+  → 浏览器保存恢复令牌
+  → POST /api/seedream/jobs action=run（携带本次 API Key 与 Request Body）
   → app/lib/seedream-server.ts
   → POST https://ark.cn-beijing.volces.com/api/v3/images/generations
 
@@ -55,8 +57,9 @@ SeedreamWorkbench Prompt 优化按钮
 ```
 
 浏览器只调用同源路由。普通方舟 API Key 复用演示工作台的当前浏览器凭证槽位，
-不会进入 URL、Cookie、SSR HTML、源码、D1 或日志。服务端只在后台任务执行期间临时持有
-本次请求；D1 不保存 Prompt、参考图或完整 Request Body。
+不会进入 URL、Cookie、SSR HTML、源码、D1 或日志。服务端只在 `run` 请求执行期间临时持有
+本次请求；D1 不保存 Prompt、参考图或完整 Request Body。任务 ID 与恢复令牌会在长调用开始前
+先返回并写入浏览器，因此刷新后可查询同一次执行的终态。
 
 ## 服务端边界
 
