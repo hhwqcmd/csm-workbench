@@ -133,17 +133,22 @@ export async function uploadManualMaterialToTos(
   const id = crypto.randomUUID();
   const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   const objectKey = `${config.prefix}${kind}/uploads/${date}/${id}-${name}`;
-  const counter: ByteCounter = { value: 0 };
   const inspected = await validatedMimeStream(request.body, kind, contentType);
-  const limited = limitStream(inspected, MAX_BYTES[kind], kind, counter);
-  await putObject(config, objectKey, limited, contentType);
+  const counter: ByteCounter = { value: 0 };
+  const uploadBody =
+    kind === "image"
+      ? await readLimitedBytes(inspected, MAX_BYTES[kind], kind)
+      : limitStream(inspected, MAX_BYTES[kind], kind, counter);
+  await putObject(config, objectKey, uploadBody, contentType);
   return materialAsset({
     id: `manual-${id}`,
     kind,
     objectKey,
     name,
     contentType,
-    size: declaredSize ?? counter.value,
+    size:
+      declaredSize ??
+      (uploadBody instanceof Uint8Array ? uploadBody.byteLength : counter.value),
     source: "manual",
     sourceRef: `manual:${id}`,
   });
@@ -164,7 +169,7 @@ async function fetchRemoteBody(
   rawUrl: string,
   kind: "video" | "image",
 ): Promise<{
-  body: ReadableStream<Uint8Array>;
+  body: Uint8Array | ReadableStream<Uint8Array>;
   contentType: string;
   size: number;
   counter?: ByteCounter;
@@ -197,16 +202,20 @@ async function fetchRemoteBody(
     if (size > MAX_BYTES[kind]) {
       throw new MaterialsValidationError(sizeMessage(kind));
     }
-    const counter: ByteCounter = { value: 0 };
     const inspected = await validatedMimeStream(
       response.body,
       kind,
       contentType,
     );
+    const counter: ByteCounter = { value: 0 };
+    const body =
+      kind === "image"
+        ? await readLimitedBytes(inspected, MAX_BYTES[kind], kind)
+        : limitStream(inspected, MAX_BYTES[kind], kind, counter);
     return {
-      body: limitStream(inspected, MAX_BYTES[kind], kind, counter),
+      body,
       contentType,
-      size,
+      size: size || (body instanceof Uint8Array ? body.byteLength : 0),
       counter,
     };
   }
@@ -253,13 +262,20 @@ async function putObject(
     // TOS pre-signing authenticates host and the unsigned payload marker.
     // Content-Type is still sent with the PUT so the object remains previewable.
   });
-  const response = await fetch(url, {
-    method: "PUT",
-    headers: { "content-type": contentType },
-    body,
-    redirect: "error",
-    signal: AbortSignal.timeout(300_000),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "PUT",
+      headers: { "content-type": contentType },
+      body,
+      redirect: "error",
+      signal: AbortSignal.timeout(300_000),
+    });
+  } catch {
+    throw new MaterialsServiceError(
+      "TOS 上传请求未能发送，请稍后重试或联系管理员检查运行环境网络。",
+    );
+  }
   if (!response.ok) {
     const requestId = response.headers.get("x-tos-request-id");
     throw new MaterialsServiceError(
@@ -456,19 +472,19 @@ async function validatedMimeStream(
   kind: MaterialKind,
   contentType: string,
 ): Promise<ReadableStream<Uint8Array>> {
-  const reader = source.getReader();
+  const [inspection, upload] = source.tee();
+  const reader = inspection.getReader();
   const buffered: Uint8Array[] = [];
   let bufferedBytes = 0;
-  let finished = false;
   while (bufferedBytes < 32) {
     const item = await reader.read();
     if (item.done) {
-      finished = true;
       break;
     }
     buffered.push(item.value);
     bufferedBytes += item.value.byteLength;
   }
+  void reader.cancel();
   const prefix = new Uint8Array(Math.min(bufferedBytes, 32));
   let offset = 0;
   for (const chunk of buffered) {
@@ -478,31 +494,40 @@ async function validatedMimeStream(
     prefix.set(slice, offset);
     offset += slice.byteLength;
   }
-  assertMimeSignature(kind, contentType, prefix);
-  let bufferedIndex = 0;
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      if (bufferedIndex < buffered.length) {
-        controller.enqueue(buffered[bufferedIndex]);
-        bufferedIndex += 1;
-        return;
-      }
-      if (finished) {
-        controller.close();
-        return;
-      }
-      const item = await reader.read();
-      if (item.done) {
-        finished = true;
-        controller.close();
-      } else {
-        controller.enqueue(item.value);
-      }
-    },
-    cancel(reason) {
-      return reader.cancel(reason);
-    },
-  });
+  try {
+    assertMimeSignature(kind, contentType, prefix);
+  } catch (error) {
+    void upload.cancel(error);
+    throw error;
+  }
+  return upload;
+}
+
+async function readLimitedBytes(
+  source: ReadableStream<Uint8Array>,
+  maximum: number,
+  kind: MaterialKind,
+): Promise<Uint8Array> {
+  const reader = source.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const item = await reader.read();
+    if (item.done) break;
+    size += item.value.byteLength;
+    if (size > maximum) {
+      await reader.cancel();
+      throw new MaterialsValidationError(sizeMessage(kind));
+    }
+    chunks.push(item.value);
+  }
+  const output = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
 }
 
 function assertMimeSignature(

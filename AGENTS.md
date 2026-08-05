@@ -19,7 +19,7 @@
 - 默认连接为标准官方 API + `doubao-seedance-2-0-mini-260615`，同时支持 Agent Plan 套餐通道。
 - 生产 Sites 项目使用 `.openai/hosting.json` 中既有 `project_id`，访问策略为公开直达。
 - 应用入口不要求登录；`app/chatgpt-auth.ts` 是未被引用的托管认证遗留代码，不得据此重新接回登录。
-- 任务历史和演示凭证只保存在当前浏览器，不是跨设备或服务端审计记录。
+- 任务历史和演示凭证只保存在当前浏览器，不是跨设备或服务端审计记录；Seedream 仅把活跃任务状态、脱敏错误和 URL 格式结果暂存 D1 24 小时用于刷新恢复，不保存 API Key、Prompt 或完整请求。
 - TOS 素材文件使用固定 `demo/` 前缀；素材索引只保存在当前浏览器，不使用 D1/R2，也不从 TOS 反向列举。
 - 生产站公开直达，素材保存与手动上传接口按已确认方案不做写鉴权；输入校验不能消除公开写入带来的存储、流量与滥用风险。
 
@@ -27,9 +27,9 @@
 
 - `app/page.tsx` → `app/components/WorkspaceShell.tsx`：页面入口、顶级栏目和整体组合。
 - `app/components/SeedanceTaskRunner.tsx`：连接、参数、完整 API 编辑、费用确认、创建、轮询、历史和日志。
-- `app/components/SeedreamWorkbench.tsx`：十类 Seedream 示例的表单/JSON 双向编辑、Prompt 技巧与 Seed-Evolving 优化、同步/流式结果、费用确认、历史和日志。
-- `app/lib/seedream-examples.ts`、`app/lib/seedream-server.ts`：Seedream 示例、模型能力适配、严格字段/素材/尺寸校验与同源上游代理。
-- `app/api/seedream/`：图片生成和 Prompt 优化同源路由。
+- `app/components/SeedreamWorkbench.tsx`：十类 Seedream 示例的表单/JSON 双向编辑、Prompt 技巧与 Seed-Evolving 优化、可恢复后台生成、费用确认、历史和日志。
+- `app/lib/seedream-examples.ts`、`app/lib/seedream-server.ts`、`app/lib/seedream-jobs-server.ts`：Seedream 示例、模型能力适配、严格字段/素材/尺寸校验、同源上游代理与 24 小时短期任务状态。
+- `app/api/seedream/`：图片后台任务、兼容生成入口和 Prompt 优化同源路由。
 - `app/components/ResponsesWorkbench.tsx`：Responses API 八类场景、表单/JSON 联动、生命周期操作、SSE、响应、完整协议目录、历史与日志。
 - `app/lib/responses-examples.ts`、`app/lib/responses-server.ts`、`app/api/responses/route.ts`：示例与字段目录、标准 Base URL 白名单、请求校验、同步/流式代理和生命周期入口。
 - `app/components/ManagedAgentsWorkbench.tsx`：Managed Agents 三步表单；第 3 步含 Session 生命周期、事件、Files/Resources、TOS 与 Memory Store/Memory 管理；三步都展示完整 API 与响应，并负责资源 ID、SSE、历史与日志。
@@ -48,7 +48,7 @@
 - `official-quickstart/`：官方 Python 基线；关键入口为 `python/demo_standard.py`。
 - `start_workbench.sh`：本地启动与环境检查，不安装依赖、不打开浏览器、不调用真实 API。
 - `worker/`、`build/`、`vite.config.ts`：vinext/Cloudflare Worker 适配层。
-- `db/`、`drizzle/`、`examples/d1/`：未启用的持久化样例与预留层。
+- `db/`、`drizzle/`：Seedream 短期后台任务的 D1 schema 与迁移；`examples/d1/` 仍为样例。
 - `tests/rendered-html.test.mjs`：页面契约、服务端边界和安全回归测试。
 
 核心依赖方向：
@@ -58,6 +58,8 @@
 `ManagedAgentsWorkbench → /api/managed-agents/* → managed-agents-server → 火山方舟 Managed Agents API`
 
 `ResponsesWorkbench → /api/responses → responses-server → 火山方舟 Responses API`
+
+`SeedreamWorkbench → /api/seedream/jobs → D1 短期任务状态 → seedream-server → 火山方舟 Image generation API`
 
 `Seedance / Seedream / TemplateAssetLibrary → /api/materials/* → 私有 TOS demo/ → 浏览器本机素材索引`
 
@@ -100,6 +102,7 @@
 - Seedream 默认使用 `doubao-seedream-5-0-pro-260628`；组图、联网和流式按官方能力限制使用 Lite。Prompt 一键优化固定调用 `doubao-seed-evolving`，不能与图片 API 的 `optimize_prompt_options` 混为一谈。
 - Seedream 图片只允许公网 HTTPS URL 或受控图片 Base64；Pro 最多 10 张参考图，Lite 最多 14 张，组图输入与输出合计最多 15 张。故事书/连环画附录不进入产品。
 - Seedream 真实图片生成必须费用确认；Prompt 优化只在显式点击时调用。页面加载、示例切换、构建与自动化测试不得产生真实调用。
+- Seedream 生成使用服务端后台任务；浏览器仅本地保存恢复令牌，D1 只保留任务状态、URL 格式结果与脱敏错误 24 小时。不得把 API Key、Prompt、参考图或完整请求写入 D1；`b64_json` 不进入可恢复任务。
 - Responses API 只使用标准 `https://ark.cn-beijing.volces.com/api/v3` 与普通方舟 Key。所有创建、查询、Input Items 和删除操作必须经同源 POST，不能开放任意 Base URL。
 - AI coding 栏目只使用仓库内模拟组织与指标数据；同源 GET 接口不得接入员工身份、真实代码内容、会话 Prompt、凭证或生产效能平台。页面不得把模拟数据表述为真实客户成效。
 - Responses 创建必须费用确认，永久删除必须不可逆确认；缓存要求 `store=true`，前缀缓存还要求 `stream=false`，且缓存不能与非 Function 内置工具混用。

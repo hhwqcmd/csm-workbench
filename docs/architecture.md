@@ -30,10 +30,16 @@ Managed Agents 路径
 Seedream 路径
 浏览器
   → SeedreamWorkbench
-  → POST /api/seedream/generate 或 /api/seedream/optimize-prompt
+  → POST /api/seedream/jobs（创建 / 查询可恢复任务）
+  → app/lib/seedream-jobs-server.ts + D1（24 小时短期状态）
   → app/lib/seedream-server.ts
   → 标准 API 白名单 Base URL
-  → Image generation API 或 doubao-seed-evolving Chat Completions
+  → Image generation API
+
+浏览器 Prompt 优化
+  → POST /api/seedream/optimize-prompt
+  → app/lib/seedream-server.ts
+  → doubao-seed-evolving Chat Completions
 
 Responses API 路径
 浏览器
@@ -91,9 +97,9 @@ AI coding 路径
 6. 查询并归一化任务状态。
 7. 对错误进行安全脱敏，避免返回 Secret 或内部日志。
 8. Managed Agents 校验 Agent 创建/版本化更新的完整字段、Skills/Tools/MCP/Multi Agent 约束，以及云环境、Session、事件、文件资源与 Memory Store/Memory 结构；事件流必须先建立上游 SSE，再发送用户事件。
-9. Seedream 校验 Pro/Lite 模型能力、图片公网地址、输入数量、尺寸、组图、联网、流式与图片 API Prompt 优化参数；Prompt 一键优化只使用服务端内置场景技巧调用 `doubao-seed-evolving`。
+9. Seedream 校验 Pro/Lite 模型能力、图片公网地址、输入数量、尺寸、组图、联网、流式与图片 API Prompt 优化参数；真实生成在费用确认后创建后台任务，D1 只保存 24 小时状态、URL 结果和脱敏错误，API Key、Prompt、参考图与完整请求只存在于本次请求和后台执行闭包；Prompt 一键优化只使用服务端内置场景技巧调用 `doubao-seed-evolving`。
 10. Responses API 校验完整顶层字段、InputItem 素材 URL、工具必填项、缓存互斥和生命周期 ID；同步 JSON 与 SSE 均在返回浏览器前执行凭证脱敏。
-11. 素材接口固定 TOS bucket、Endpoint、Region 与 `demo/` 前缀，校验 MIME、大小、对象键和公网 HTTPS 重定向；TOS AK/SK 只用于服务端签名，不进入浏览器或错误响应。
+11. 素材接口固定 TOS bucket、Endpoint、Region 与 `demo/` 前缀，校验 MIME、大小、对象键和公网 HTTPS 重定向；图片在校验后以不超过 20 MB 的固定长度二进制请求体上传，视频和音频保持限流流式上传；TOS AK/SK 只用于服务端签名，不进入浏览器或错误响应。
 
 浏览器负责收集参数、管理本机演示凭证、生成完整 API 预览、保存任务历史与脱敏日志、展示状态和播放结果。
 
@@ -119,7 +125,7 @@ AI coding 路径
 - Files 上传使用同源 multipart 代理，服务端固定 `purpose=agent`，不接受浏览器指定任意 purpose。Session 创建可挂载 file、TOS 目录和 Memory Store；运行时资源路由只允许增删 file，避免伪造官方不支持的动态 Memory Store 挂载。
 - Memory Store 与 Memory 内容通过独立同源路由管理。浏览器只保留当前演示所需的资源 ID，服务端不保存文件内容、Memory 内容或 API Key；所有请求/响应继续进入浏览器脱敏日志。
 - Seedream 十类示例集中定义在 `app/lib/seedream-examples.ts`。默认图片模型为 `doubao-seedream-5-0-pro-260628`；官方未支持 Pro 的组图、联网和流式场景显式切换为 Lite。Prompt 编辑框的一键优化调用 `doubao-seed-evolving`，并把当前示例的服务端可信技巧作为约束。
-- Seedream 最近 30 次生成与优化操作单独保存在当前浏览器，Authorization 只保存掩码。Base64 结果只在当前页面保留，写入历史时替换为长度占位，避免撑爆设备本地存储。
+- Seedream 最近 30 次生成与优化操作单独保存在当前浏览器，Authorization 只保存掩码。浏览器另存一份匿名恢复令牌，刷新后查询 D1 中最长保留 24 小时的活跃任务；服务端任务表不保存 API Key、Prompt、参考图或完整请求。可恢复任务固定要求 `response_format=url`，Base64 结果仍只适用于兼容直连路由。
 - Responses API 八类示例集中定义在 `app/lib/responses-examples.ts`；高频参数表单与完整 JSON 共享同一份 Request Body。最近 30 次操作单独保存在当前浏览器，流式事件保留原始时间线并提取文本，所有敏感字段在记录前脱敏。
 - 素材库的“模板分类”和“素材库”平级；素材库按视频、图片、音频分栏。`app/lib/material-assets.ts` 只保存对象元数据和稳定对象键，原始生成 URL、文件内容、TOS 凭证与预签名 URL都不进入本地索引。
 
@@ -141,7 +147,7 @@ AI coding 路径
 - Agent Plan API 地址必须包含 `/plan`。创建任务完整地址为 `https://ark.cn-beijing.volces.com/api/plan/v3/contents/generations/tasks`，查询地址在其后追加 `/{id}`。
 - 标准 API 完整创建地址为 `https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks`。
 - Managed Agents 资源与事件 API 固定在标准 `/api/v3`；Agent Plan 地址不开放给该模块。
-- Seedream 图片生成与 Prompt 优化固定在标准 `/api/v3`；页面加载、示例切换和自动化测试不会产生图片或文本模型调用。
+- Seedream 图片生成与 Prompt 优化固定在标准 `/api/v3`；页面加载、示例切换和自动化测试不会产生图片或文本模型调用。刷新只使用匿名令牌查询已创建任务，不会重复创建计费请求。
 - Responses API 创建、检索、Input Items 和删除固定在标准 `/api/v3`；真实创建与工具调用需要费用确认，永久删除需要单独确认，页面加载和自动化测试不会产生真实调用。
 - 素材保存和上传是独立显式操作，不会再次调用 Seedance 或 Seedream。生产写接口当前无身份鉴权，公开访客可产生真实 TOS 费用；固定路径、大小、MIME 与 SSRF 校验只限制请求形态。
 - LLM 趋势不接收 Key、不调用任何模型或榜单 API；来源链接只在用户主动点击后打开厂商或第三方页面。

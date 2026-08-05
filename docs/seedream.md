@@ -36,9 +36,16 @@
 
 ```text
 SeedreamWorkbench
-  → POST /api/seedream/generate
+  → POST /api/seedream/jobs action=create
+  → app/lib/seedream-jobs-server.ts
+  → D1 记录匿名任务 ID、恢复令牌哈希和 24 小时状态
   → app/lib/seedream-server.ts
   → POST https://ark.cn-beijing.volces.com/api/v3/images/generations
+
+SeedreamWorkbench 刷新恢复
+  → POST /api/seedream/jobs action=status
+  → 匿名任务 ID + 当前浏览器恢复令牌
+  → 返回 pending / running / succeeded / failed
 
 SeedreamWorkbench Prompt 优化按钮
   → POST /api/seedream/optimize-prompt
@@ -48,7 +55,8 @@ SeedreamWorkbench Prompt 优化按钮
 ```
 
 浏览器只调用同源路由。普通方舟 API Key 复用演示工作台的当前浏览器凭证槽位，
-不会进入 URL、Cookie、SSR HTML、源码、服务端持久化或日志。
+不会进入 URL、Cookie、SSR HTML、源码、D1 或日志。服务端只在后台任务执行期间临时持有
+本次请求；D1 不保存 Prompt、参考图或完整 Request Body。
 
 ## 服务端边界
 
@@ -62,15 +70,17 @@ SeedreamWorkbench Prompt 优化按钮
 - 按模型校验分辨率档位、自定义总像素范围与宽高比。
 - Pro 不允许组图、流式输出和联网搜索；Lite 的 Image API Prompt 优化不允许
   `fast`。
-- 流式响应保持 SSE 透传；非流式响应在返回浏览器前执行 Key 脱敏。
+- 后台任务可处理非流式或上游 SSE，结果完成后统一写入短期状态；页面轮询同源任务状态。
+- 可刷新恢复的后台任务要求 `response_format=url`，不把大体积 Base64 图片写入 D1。
 
 ## 历史、日志与大响应
 
 - 最近 30 次图片生成或 Prompt 优化保存在当前浏览器。
+- 当前浏览器额外保存一个匿名任务 ID 与恢复令牌；刷新或稍后返回时继续查询，不会重复提交图片生成。
+- D1 只保留任务状态、URL 格式结果和脱敏错误 24 小时；过期后无法恢复，且该记录不是跨设备历史或审计日志。
 - 日志记录实际 Method、URL、完整请求体、HTTP 状态与脱敏响应。
 - Authorization 只保存首尾掩码。
-- Base64 图片会在当前结果区显示，但写入本地历史时只保存长度占位，避免超过
-  `localStorage` 容量；URL 结果可记录但官方只保留 24 小时。
+- 兼容直连路由仍可返回 Base64 图片，但后台可恢复任务只接受 URL 结果；URL 结果可记录但官方只保留 24 小时。
 - 页面加载、切换场景、自动化测试和健康检查不会调用真实 API。
 - 图片生成必须勾选费用确认；Prompt 优化只在用户点击按钮时调用。
 

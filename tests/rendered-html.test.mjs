@@ -564,20 +564,50 @@ test("keeps Seedream prompt optimization explicit, masked, and locally logged", 
   );
 
   assert.match(source, /\/api\/seedream\/optimize-prompt/);
-  assert.match(source, /\/api\/seedream\/generate/);
+  assert.match(source, /\/api\/seedream\/jobs/);
   assert.match(source, /先填写 API Key 后优化/);
   assert.match(source, /Bearer 未填写/);
   assert.match(source, /focusApiKey/);
   assert.match(source, /seedance-workbench:demo-credentials:v1/);
   assert.match(source, /seedream-workbench:history:v1/);
+  assert.match(source, /seedream-workbench:pending-job:v1/);
+  assert.match(source, /本浏览器会自动恢复进度/);
   assert.match(source, /apiKey\.trim\(\)/);
   assert.match(source, /`Bearer \$\{maskApiKey\(apiKey\)\}`/);
   assert.match(source, /costConfirmed/);
   assert.match(source, /applyApiDraft/);
-  assert.match(source, /consumeSeedreamStream/);
+  assert.match(source, /resumeToken/);
   assert.match(exampleSource, /SEEDREAM_EXAMPLES/);
   assert.equal((exampleSource.match(/index: "\d\d"/g) ?? []).length, 10);
   assert.doesNotMatch(exampleSource, /故事书|连环画/);
+});
+
+test("keeps Seedream generation recoverable without persisting credentials", async () => {
+  const jobSource = await readFile(
+    new URL("../app/lib/seedream-jobs-server.ts", import.meta.url),
+    "utf8",
+  );
+  const routeSource = await readFile(
+    new URL("../app/api/seedream/jobs/route.ts", import.meta.url),
+    "utf8",
+  );
+  const schema = await readFile(
+    new URL("../drizzle/0000_gorgeous_gambit.sql", import.meta.url),
+    "utf8",
+  );
+  const hosting = JSON.parse(
+    await readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
+  );
+
+  assert.equal(hosting.d1, "DB");
+  assert.match(schema, /CREATE TABLE `seedream_jobs`/);
+  assert.match(schema, /`resume_token_hash` text NOT NULL/);
+  assert.match(jobSource, /after\(\(\) => runSeedreamJob/);
+  assert.match(jobSource, /JOB_TTL_SECONDS = 24 \* 60 \* 60/);
+  assert.match(jobSource, /response_format=url/);
+  assert.match(routeSource, /createSeedreamJob/);
+  assert.match(routeSource, /getSeedreamJob/);
+  assert.doesNotMatch(schema, /api_key|prompt|request_json/i);
 });
 
 test("server-renders the editable Managed Agents three-step workbench", async () => {
@@ -937,6 +967,24 @@ test("imports, uploads, and previews private TOS materials through signed routes
     assert.equal(importedAsset.size, 4);
     assert.match(importedAsset.objectKey, /^demo\/image\/generated\/[a-f0-9]{64}\.png$/);
     assert.equal("sourceValue" in importedAsset, false);
+    assert.ok(
+      upstreamRequests[1].init.body instanceof Uint8Array,
+      "generated images should use a fixed-length binary body for TOS",
+    );
+
+    const uploadedImage = await request(
+      "/api/materials/upload?kind=image&name=manual.png",
+      {
+        method: "POST",
+        headers: { "content-type": "image/png", "content-length": "4" },
+        body: new Uint8Array([137, 80, 78, 71]),
+      },
+    );
+    assert.equal(uploadedImage.status, 201);
+    assert.ok(
+      upstreamRequests.at(-1).init.body instanceof Uint8Array,
+      "manual images should use a fixed-length binary body for TOS",
+    );
 
     const uploaded = await request(
       "/api/materials/upload?kind=audio&name=folder%5Csample.mp3",

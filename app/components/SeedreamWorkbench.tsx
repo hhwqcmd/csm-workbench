@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   SEEDREAM_BASE_URL,
   SEEDREAM_DEFAULT_MODEL,
@@ -50,9 +50,24 @@ type OptimizeResponse = {
   response?: unknown;
 };
 
+type PendingSeedreamJob = {
+  jobId: string;
+  resumeToken: string;
+  historyId: string;
+  createdAt: string;
+};
+
+type SeedreamJobStatusResponse = {
+  status?: "pending" | "running" | "succeeded" | "failed";
+  result?: unknown;
+  error?: string;
+};
+
 const HISTORY_STORAGE_KEY = "seedream-workbench:history:v1";
+const PENDING_JOB_STORAGE_KEY = "seedream-workbench:pending-job:v1";
 const CREDENTIAL_STORAGE_KEY = "seedance-workbench:demo-credentials:v1";
 const MAX_HISTORY_RECORDS = 30;
+const JOB_POLL_INTERVAL_MS = 2_000;
 
 export function SeedreamWorkbench() {
   const [selectedId, setSelectedId] = useState(SEEDREAM_EXAMPLES[0].id);
@@ -84,6 +99,8 @@ export function SeedreamWorkbench() {
   const [latestResponse, setLatestResponse] = useState<unknown>();
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [selectedLogId, setSelectedLogId] = useState("");
+  const pollingJobRef = useRef("");
+  const pollingAbortRef = useRef<AbortController | null>(null);
 
   const active = status === "optimizing" || status === "generating";
   const generationEndpoint = `${SEEDREAM_BASE_URL}/images/generations`;
@@ -100,17 +117,159 @@ export function SeedreamWorkbench() {
   const generationReady =
     Boolean(apiKey.trim()) &&
     Boolean(requestBody.prompt.trim()) &&
+    requestBody.response_format !== "b64_json" &&
     costConfirmed &&
     !active;
+
+  const upsertHistory = useCallback((record: HistoryRecord) => {
+    setHistory((current) => {
+      const next = [
+        record,
+        ...current.filter((item) => item.id !== record.id),
+      ].slice(0, MAX_HISTORY_RECORDS);
+      writeHistory(next);
+      return next;
+    });
+  }, []);
+
+  const patchHistory = useCallback(
+    (id: string, patch: Partial<HistoryRecord>) => {
+      setHistory((current) => {
+        const next = current.map((item) =>
+          item.id === id ? { ...item, ...patch } : item,
+        );
+        writeHistory(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const pollSeedreamJob = useCallback(
+    async (pendingJob: PendingSeedreamJob) => {
+      if (pollingJobRef.current === pendingJob.jobId) return;
+      pollingAbortRef.current?.abort();
+      const controller = new AbortController();
+      pollingAbortRef.current = controller;
+      pollingJobRef.current = pendingJob.jobId;
+      setActiveGenerationId(pendingJob.historyId);
+      setStatus("generating");
+
+      try {
+        while (!controller.signal.aborted) {
+          let response: Response;
+          let payload: SeedreamJobStatusResponse;
+          try {
+            response = await fetch("/api/seedream/jobs", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              cache: "no-store",
+              signal: controller.signal,
+              body: JSON.stringify({
+                action: "status",
+                jobId: pendingJob.jobId,
+                resumeToken: pendingJob.resumeToken,
+              }),
+            });
+            payload = (await response.json()) as SeedreamJobStatusResponse;
+          } catch {
+            if (controller.signal.aborted) return;
+            setError("任务仍在后台执行，状态查询暂时失败，将自动重试。");
+            await waitForJobPoll(controller.signal);
+            continue;
+          }
+
+          if (!response.ok) {
+            if (response.status >= 500) {
+              setError("任务仍在后台执行，状态查询暂时失败，将自动重试。");
+              await waitForJobPoll(controller.signal);
+              continue;
+            }
+            const message = payload.error ?? "无法恢复图片生成任务。";
+            setStatus("failed");
+            setError(message);
+            setCostConfirmed(false);
+            patchHistory(pendingJob.historyId, {
+              status: "failed",
+              error: message,
+            });
+            clearPendingSeedreamJob(pendingJob.jobId);
+            return;
+          }
+
+          if (payload.status === "pending" || payload.status === "running") {
+            setStatus("generating");
+            setError("");
+            await waitForJobPoll(controller.signal);
+            continue;
+          }
+
+          if (payload.status === "failed") {
+            const message = payload.error ?? "图片生成失败。";
+            setStatus("failed");
+            setError(message);
+            setCostConfirmed(false);
+            patchHistory(pendingJob.historyId, {
+              status: "failed",
+              error: message,
+            });
+            clearPendingSeedreamJob(pendingJob.jobId);
+            return;
+          }
+
+          if (payload.status === "succeeded") {
+            const responseBody = payload.result ?? {};
+            const resultImages = extractImages(responseBody);
+            setImages(resultImages);
+            setLatestResponse(responseBody);
+            setStatus("succeeded");
+            setError("");
+            setCostConfirmed(false);
+            patchHistory(pendingJob.historyId, {
+              status: "succeeded",
+              response: {
+                httpStatus: 200,
+                body: compactForStorage(responseBody),
+              },
+              images: resultImages.filter(
+                (image) => !image.url.startsWith("data:"),
+              ),
+            });
+            clearPendingSeedreamJob(pendingJob.jobId);
+            return;
+          }
+
+          setError("任务状态暂不可识别，将自动重试。");
+          await waitForJobPoll(controller.signal);
+        }
+      } finally {
+        if (pollingJobRef.current === pendingJob.jobId) {
+          pollingJobRef.current = "";
+          pollingAbortRef.current = null;
+        }
+      }
+    },
+    [patchHistory],
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setApiKey(readOfficialCredential());
       setHistory(readHistory());
       setStorageReady(true);
+      const pendingJob = readPendingSeedreamJob();
+      if (pendingJob) {
+        setActiveGenerationId(pendingJob.historyId);
+        setStatus("generating");
+        setError("");
+        void pollSeedreamJob(pendingJob);
+      }
     }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    return () => {
+      window.clearTimeout(timer);
+      pollingAbortRef.current?.abort();
+    };
+  }, [pollSeedreamJob]);
 
   useEffect(() => {
     if (!storageReady) return;
@@ -339,42 +498,37 @@ export function SeedreamWorkbench() {
     setLatestResponse(undefined);
 
     try {
-      const response = await fetch("/api/seedream/generate", {
+      const response = await fetch("/api/seedream/jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ apiKey, requestBody: submittedBody }),
+        body: JSON.stringify({
+          action: "create",
+          apiKey,
+          requestBody: submittedBody,
+        }),
       });
+      const payload = (await response.json()) as {
+        jobId?: string;
+        resumeToken?: string;
+        error?: string;
+      };
       if (!response.ok) {
-        const payload = (await response.json()) as { error?: string };
         throw new Error(payload.error ?? "图片生成失败。");
       }
-
-      let responseBody: unknown;
-      let resultImages: ResultImage[];
-      if (submittedBody.stream) {
-        const events = await consumeSeedreamStream(response, (event) => {
-          setImages((current) => mergeImages(current, extractImages(event)));
-        });
-        responseBody = { events };
-        resultImages = extractImages(events);
-      } else {
-        responseBody = await response.json();
-        resultImages = extractImages(responseBody);
-        setImages(resultImages);
+      if (!payload.jobId || !payload.resumeToken) {
+        throw new Error("后台任务创建成功，但没有返回恢复凭证。");
       }
-
-      setLatestResponse(responseBody);
-      setStatus("succeeded");
-      setCostConfirmed(false);
-      patchHistory(historyId, {
-        status: "succeeded",
-        response: {
-          httpStatus: response.status,
-          body: compactForStorage(responseBody),
-        },
-        images: resultImages.filter((image) => !image.url.startsWith("data:")),
-      });
+      const pendingJob: PendingSeedreamJob = {
+        jobId: payload.jobId,
+        resumeToken: payload.resumeToken,
+        historyId,
+        createdAt: submittedAt,
+      };
+      if (!writePendingSeedreamJob(pendingJob)) {
+        setError("浏览器无法保存任务恢复凭证，请保持页面打开直到本次生成完成。");
+      }
+      await pollSeedreamJob(pendingJob);
     } catch (generateError) {
       const message =
         generateError instanceof Error
@@ -385,21 +539,6 @@ export function SeedreamWorkbench() {
       setCostConfirmed(false);
       patchHistory(historyId, { status: "failed", error: message });
     }
-  }
-
-  function upsertHistory(record: HistoryRecord) {
-    setHistory((current) =>
-      [record, ...current.filter((item) => item.id !== record.id)].slice(
-        0,
-        MAX_HISTORY_RECORDS,
-      ),
-    );
-  }
-
-  function patchHistory(id: string, patch: Partial<HistoryRecord>) {
-    setHistory((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    );
   }
 
   async function saveAllImages() {
@@ -775,12 +914,22 @@ export function SeedreamWorkbench() {
                 type="button"
               >
                 {status === "generating"
-                  ? "正在生成…"
+                  ? "后台生成中…"
                   : requestBody.stream
                     ? "执行流式图片生成"
                     : "执行真实图片生成"}
               </button>
               {!apiKey.trim() && <small>请先填写普通方舟 API Key。</small>}
+              {requestBody.response_format === "b64_json" && (
+                <small>
+                  可刷新恢复的后台任务要求 response_format=url，请在参数区切换后执行。
+                </small>
+              )}
+              {status === "generating" && (
+                <small>
+                  任务已在服务端后台执行；可刷新或稍后返回，本浏览器会自动恢复进度。
+                </small>
+              )}
             </section>
           </div>
 
@@ -1100,53 +1249,54 @@ function writeHistory(history: HistoryRecord[]) {
   }
 }
 
-async function consumeSeedreamStream(
-  response: Response,
-  onEvent: (event: unknown) => void,
-): Promise<unknown[]> {
-  if (!response.body) throw new Error("流式响应没有可读取内容。");
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  const events: unknown[] = [];
-  let buffer = "";
+function readPendingSeedreamJob(): PendingSeedreamJob | null {
+  try {
+    const raw = window.localStorage.getItem(PENDING_JOB_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingSeedreamJob>;
+    return typeof parsed.jobId === "string" &&
+      typeof parsed.resumeToken === "string" &&
+      typeof parsed.historyId === "string" &&
+      typeof parsed.createdAt === "string"
+      ? (parsed as PendingSeedreamJob)
+      : null;
+  } catch {
+    return null;
+  }
+}
 
-  while (true) {
-    const { done, value } = await reader.read();
-    buffer += decoder.decode(value, { stream: !done });
-    const frames = buffer.split(/\r?\n\r?\n/);
-    buffer = frames.pop() ?? "";
-    for (const frame of frames) {
-      const data = frame
-        .split(/\r?\n/)
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trim())
-        .join("\n");
-      if (!data || data === "[DONE]") continue;
-      let event: unknown = data;
-      try {
-        event = JSON.parse(data);
-      } catch {
-        // Preserve non-JSON events verbatim in the response log.
-      }
-      events.push(event);
-      onEvent(event);
-    }
-    if (done) break;
+function writePendingSeedreamJob(job: PendingSeedreamJob): boolean {
+  try {
+    window.localStorage.setItem(PENDING_JOB_STORAGE_KEY, JSON.stringify(job));
+    return true;
+  } catch {
+    return false;
   }
-  if (buffer.trim()) {
-    const data = buffer.replace(/^data:\s*/gm, "").trim();
-    if (data && data !== "[DONE]") {
-      let event: unknown = data;
-      try {
-        event = JSON.parse(data);
-      } catch {
-        // Preserve the final non-JSON event verbatim.
-      }
-      events.push(event);
-      onEvent(event);
+}
+
+function clearPendingSeedreamJob(jobId: string) {
+  try {
+    const current = readPendingSeedreamJob();
+    if (!current || current.jobId === jobId) {
+      window.localStorage.removeItem(PENDING_JOB_STORAGE_KEY);
     }
+  } catch {
+    // A finished task must remain usable even if localStorage is unavailable.
   }
-  return events;
+}
+
+function waitForJobPoll(signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(resolve, JOB_POLL_INTERVAL_MS);
+    signal.addEventListener(
+      "abort",
+      () => {
+        window.clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
 }
 
 function extractImages(value: unknown): ResultImage[] {
