@@ -4,9 +4,9 @@
 
 本项目是火山方舟 API 演示与模板资产平台，包含七个平级顶层栏目：
 
-1. **演示工作台**：配置官方 API 或 Agent Plan、审核完整请求、创建异步任务，并查看结果、历史和请求/响应日志。
-2. **模板资产库**：浏览提示词、电商宣发、影视短剧和营销短视频模板，并将场景参数预填到同一个实操台。
-3. **Seedream 演示**：覆盖官方图片教程的十类非故事书示例，提供场景填写说明、Prompt 技巧、一键优化、完整 API 联动、结果、历史和脱敏日志。
+1. **模板资产库**：浏览提示词与场景模板，并以本机索引管理保存到私有 TOS 的视频、图片和音频素材。
+2. **Seedance**：配置官方 API 或 Agent Plan、审核完整请求、创建异步任务、查看结果/历史/日志，并显式保存成功视频到素材库。
+3. **Seedream**：覆盖官方图片教程的十类非故事书示例，提供 Prompt 优化、完整 API、结果、历史、日志和图片素材保存。
 4. **Responses API**：覆盖文本、多轮、推理、多模态、Function、内置工具、缓存与结构化输出，联动展示完整输入/输出协议、SSE、历史和脱敏日志。
 5. **Managed Agents**：创建或更新 Agent、配置 Agent 环境，并统一管理 Session 生命周期、事件流、文件挂载与持久化记忆。
 6. **LLM 趋势**：以日期快照展示 Seed、Seedance、Seedream 主力模型，并对比各厂商最新文本旗舰的价格、参数、编程、长程、Agent benchmark 与第三方榜单。
@@ -14,20 +14,22 @@
 
 官方 Python 快速示例作为协议和素材基线独立保留，不是产品页面主线。页面不得重新加入共学进度、环境安装步骤或教程路线。
 
-当前事实（最后核对：2026-07-29）：
+当前事实（最后核对：2026-08-06）：
 
 - 默认连接为标准官方 API + `doubao-seedance-2-0-mini-260615`，同时支持 Agent Plan 套餐通道。
-- 生产 Sites 项目使用 `.openai/hosting.json` 中既有 `project_id`，访问策略为公开直达。
+- 项目处于测试阶段，只在本地开发、调试和运行。`.openai/hosting.json` 保留既有 Sites `project_id` 作为历史关联，但短期内不得保存或部署新版本；既有站点已收紧为仅项目所有者可访问。
 - 应用入口不要求登录；`app/chatgpt-auth.ts` 是未被引用的托管认证遗留代码，不得据此重新接回登录。
-- 任务历史和演示凭证只保存在当前浏览器，不是跨设备或服务端审计记录。
+- 任务历史和演示凭证只保存在当前浏览器，不是跨设备或服务端审计记录；Seedream 仅把活跃任务状态、脱敏错误和 URL 格式结果暂存 D1 24 小时用于刷新恢复，不保存 API Key、Prompt 或完整请求。
+- TOS 素材文件使用固定 `demo/` 前缀；D1 保存长期素材索引，页面读取时仅反向列举 `demo/{video|image|audio}/` 补建历史对象。浏览器 `localStorage` 只是最多 500 条的可丢弃缓存；旧缓存仅在 TOS HEAD 校验对象存在后补写 D1。
+- 本地素材保存与手动上传接口仍不做应用内写鉴权；执行真实上传仍会产生 TOS 存储与流量费用。既有 Sites 版本不作为当前测试基线。
 
 ## 模块地图
 
 - `app/page.tsx` → `app/components/WorkspaceShell.tsx`：页面入口、顶级栏目和整体组合。
 - `app/components/SeedanceTaskRunner.tsx`：连接、参数、完整 API 编辑、费用确认、创建、轮询、历史和日志。
-- `app/components/SeedreamWorkbench.tsx`：十类 Seedream 示例的表单/JSON 双向编辑、Prompt 技巧与 Seed-Evolving 优化、同步/流式结果、费用确认、历史和日志。
-- `app/lib/seedream-examples.ts`、`app/lib/seedream-server.ts`：Seedream 示例、模型能力适配、严格字段/素材/尺寸校验与同源上游代理。
-- `app/api/seedream/`：图片生成和 Prompt 优化同源路由。
+- `app/components/SeedreamWorkbench.tsx`：十类 Seedream 示例的表单/JSON 双向编辑、Prompt 技巧与 Seed-Evolving 优化、可恢复后台生成、费用确认、历史和日志。
+- `app/lib/seedream-examples.ts`、`app/lib/seedream-server.ts`、`app/lib/seedream-jobs-server.ts`：Seedream 示例、模型能力适配、严格字段/素材/尺寸校验、同源上游代理与 24 小时短期任务状态。
+- `app/api/seedream/`：图片后台任务、兼容生成入口和 Prompt 优化同源路由。
 - `app/components/ResponsesWorkbench.tsx`：Responses API 八类场景、表单/JSON 联动、生命周期操作、SSE、响应、完整协议目录、历史与日志。
 - `app/lib/responses-examples.ts`、`app/lib/responses-server.ts`、`app/api/responses/route.ts`：示例与字段目录、标准 Base URL 白名单、请求校验、同步/流式代理和生命周期入口。
 - `app/components/ManagedAgentsWorkbench.tsx`：Managed Agents 三步表单；第 3 步含 Session 生命周期、事件、Files/Resources、TOS 与 Memory Store/Memory 管理；三步都展示完整 API 与响应，并负责资源 ID、SSE、历史与日志。
@@ -40,12 +42,13 @@
 - `app/lib/seedance-server.ts`：服务端白名单校验、上游请求、响应归一化和错误脱敏。
 - `app/api/seedance/tasks/route.ts`、`status/route.ts`：创建与查询的同源服务端入口。
 - `app/lib/seedance-examples.ts`、`SeedanceExampleGallery.tsx`：八个官方示例及连续生成计划。
-- `app/lib/template-assets.ts`、`TemplateAssetLibrary.tsx`：四类模板、十个场景预填案例及复制/跳转交互。
+- `app/lib/template-assets.ts`、`TemplateAssetLibrary.tsx`：四类模板、十个场景预填案例，以及视频/图片/音频素材的持久索引、预览、改名、删除和手动上传。
+- `app/lib/material-assets.ts`、`app/lib/materials-server.ts`、`app/lib/material-index-server.ts`、`app/api/materials/`：素材元数据契约、本地缓存、D1 持久索引、固定 TOS 配置、TOS4 签名、历史恢复、上传、临时预览、改名和同步删除。
 - `app/globals.css`、`app/layout.tsx`：视觉规则、响应式布局和站点元数据。
 - `official-quickstart/`：官方 Python 基线；关键入口为 `python/demo_standard.py`。
 - `start_workbench.sh`：本地启动与环境检查，不安装依赖、不打开浏览器、不调用真实 API。
 - `worker/`、`build/`、`vite.config.ts`：vinext/Cloudflare Worker 适配层。
-- `db/`、`drizzle/`、`examples/d1/`：未启用的持久化样例与预留层。
+- `db/`、`drizzle/`：Seedream 短期后台任务与素材长期索引的 D1 schema 和迁移；`examples/d1/` 仍为样例。
 - `tests/rendered-html.test.mjs`：页面契约、服务端边界和安全回归测试。
 
 核心依赖方向：
@@ -55,6 +58,10 @@
 `ManagedAgentsWorkbench → /api/managed-agents/* → managed-agents-server → 火山方舟 Managed Agents API`
 
 `ResponsesWorkbench → /api/responses → responses-server → 火山方舟 Responses API`
+
+`SeedreamWorkbench → /api/seedream/jobs → D1 短期任务状态 → seedream-server → 火山方舟 Image generation API`
+
+`Seedance / Seedream / TemplateAssetLibrary → /api/materials/* → 私有 TOS demo/ + D1 素材索引 → 浏览器本机缓存`
 
 `official-quickstart → volcenginesdkarkruntime → 火山方舟 API`
 
@@ -95,6 +102,7 @@
 - Seedream 默认使用 `doubao-seedream-5-0-pro-260628`；组图、联网和流式按官方能力限制使用 Lite。Prompt 一键优化固定调用 `doubao-seed-evolving`，不能与图片 API 的 `optimize_prompt_options` 混为一谈。
 - Seedream 图片只允许公网 HTTPS URL 或受控图片 Base64；Pro 最多 10 张参考图，Lite 最多 14 张，组图输入与输出合计最多 15 张。故事书/连环画附录不进入产品。
 - Seedream 真实图片生成必须费用确认；Prompt 优化只在显式点击时调用。页面加载、示例切换、构建与自动化测试不得产生真实调用。
+- Seedream 生成先创建任务并保存恢复令牌，再由独立 `run` 请求执行长调用；D1 只保留任务状态、URL 格式结果与脱敏错误 24 小时。不得把 API Key、Prompt、参考图或完整请求写入 D1；`b64_json` 不进入可恢复任务。
 - Responses API 只使用标准 `https://ark.cn-beijing.volces.com/api/v3` 与普通方舟 Key。所有创建、查询、Input Items 和删除操作必须经同源 POST，不能开放任意 Base URL。
 - AI coding 栏目只使用仓库内模拟组织与指标数据；同源 GET 接口不得接入员工身份、真实代码内容、会话 Prompt、凭证或生产效能平台。页面不得把模拟数据表述为真实客户成效。
 - Responses 创建必须费用确认，永久删除必须不可逆确认；缓存要求 `store=true`，前缀缓存还要求 `stream=false`，且缓存不能与非 Function 内置工具混用。
@@ -119,11 +127,16 @@
 - 环境依赖包只开放 `apt`、`cargo`、`gem`、`go`、`npm`、`pip` 六类；`config.env` 键名不得使用 `ARK_` 或 `VOLC_` 保留前缀。`scope` 仅为兼容性预留，不应解释为已启用的隔离能力。
 - 环境不提供版本机制；需要修改定义时创建新环境并更新后续 Session 的 `environment_id`。每个 Session 仍拥有隔离沙箱和文件系统。
 - 模板缺少素材时用空 URL 表达并显示“素材待补”；所有 URL 补齐前执行按钮必须禁用。
+- TOS AK/SK 只能来自服务端环境变量；不得进入 `NEXT_PUBLIC_*`、浏览器缓存、D1 素材索引、源码、日志或错误响应。`.env.example` 只保留空凭证占位。
+- 素材接口只允许固定 bucket、北京 Region、bucket Endpoint 和 `demo/` 前缀；对象键不得包含路径穿越，远程结果必须是公网 HTTPS，重定向逐跳复验。
+- 图片、音频、视频默认分别限制为 20 MB、50 MB、200 MB；MIME 必须与素材类型匹配。自动化测试只使用模拟 TOS，不得真实上传。
+- 素材库加载只允许使用服务端 Header 签名分页列举 `demo/{video|image|audio}/` 并补建 D1；缺少 `tos:ListBucket` 时保留 D1/本机缓存并明确告警，目录缺项也必须经 HEAD 404 复核后才能清理索引。预签名 URL 有效期 1 小时且不得持久化，媒体失败时才重新签名。
+- 素材删除必须由卡片二次确认显式触发；服务端从 D1 取对象键，先删除 TOS 再删除索引。测试不得调用真实删除。当前不提供账号级素材隔离，恢复 Sites 发布前必须重新评估无鉴权的列举与删除接口。
 
 ## 地雷与遗留区域
 
 - `app/chatgpt-auth.ts` 当前未被引用。它是平台认证模板遗留，不代表站点需要登录；除非明确重新设计访问控制，否则不要接入或扩展。
-- `db/`、`drizzle/`、`examples/d1/` 尚未启用。当前本地历史不需要数据库。
+- `db/`、`drizzle/` 已用于 Seedream 短期任务与素材长期索引；新增表必须生成并应用迁移。`examples/d1/` 仍只是样例。
 - `official-quickstart/python/preview.html` 会被官方脚本覆盖。
 - `setup_mac.sh` 会创建或更新 `.venv` 和 `run_demo.sh`；运行后检查生成内容，不要自动接着运行示例。
 - 官方 Python 示例未显式设置 Agent Plan Base URL，不能直接配 Agent Plan Key 使用。
@@ -153,12 +166,12 @@ git diff --check
 
 `npm test` 已包含构建；无需在它之前重复运行 `npm run build`。测试使用模拟上游，不能使用真实 Key。真实 API 验证必须取得用户对账号、额度、凭证和请求摘要的确认，并把结果记入 `docs/validation-log.md`。
 
-## Sites 发布
+## Sites 暂停发布
 
-- 始终复用 `.openai/hosting.json` 的既有项目，不创建或替换站点 ID。
-- 发布前必须完成验证并提交准确源码；推送的分支头、保存版本的 `commit_sha` 和打包产物必须来自同一状态。
-- 当前站点为公开访问；部署新版本属于公开生产发布，必须遵循 Sites 的公开部署审批要求。
-- 访问模式是 Sites 外部状态，不写入或伪造在 `.openai/hosting.json`。若访问策略变化，同步更新本文件的“当前事实”。
+- 当前阶段只允许本地开发、调试和验证；不得创建 Sites 保存版本、部署版本或更新托管环境。
+- `.openai/hosting.json` 的既有项目 ID 仅作历史关联，不删除、不替换，也不代表需要继续发布。
+- 既有 Sites 版本已收紧为仅项目所有者可访问，不作为当前功能或回归测试基线。
+- 只有用户后续明确恢复 Sites 发布时，才重新执行完整验证、源码提交、版本保存和部署审批流程，并保证提交 SHA 与构建产物一致。
 
 ## 提交规范
 

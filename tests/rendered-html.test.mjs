@@ -9,7 +9,7 @@ async function loadWorker() {
   return worker;
 }
 
-async function request(path = "/", init) {
+async function request(path = "/", init, bindings = {}) {
   const worker = await loadWorker();
   return worker.fetch(
     new Request(`http://localhost${path}`, {
@@ -20,12 +20,89 @@ async function request(path = "/", init) {
       ASSETS: {
         fetch: async () => new Response("Not found", { status: 404 }),
       },
+      ...bindings,
     },
     {
       waitUntil() {},
       passThroughOnException() {},
     },
   );
+}
+
+function createMaterialDatabase() {
+  const rows = new Map();
+  return {
+    prepare(query) {
+      let values = [];
+      return {
+        bind(...next) {
+          values = next;
+          return this;
+        },
+        async all() {
+          assert.match(query, /FROM material_assets/);
+          return {
+            results: [...rows.values()].sort((left, right) =>
+              right.created_at.localeCompare(left.created_at),
+            ),
+          };
+        },
+        async first() {
+          assert.match(query, /FROM material_assets[\s\S]*WHERE id = \?/);
+          return rows.get(values[0]) ?? null;
+        },
+        async run() {
+          if (/INSERT INTO material_assets/.test(query)) {
+            const [
+              id,
+              kind,
+              object_key,
+              name,
+              content_type,
+              size,
+              created_at,
+              source,
+              source_ref,
+              updated_at,
+            ] = values;
+            for (const [currentId, row] of rows) {
+              if (row.object_key === object_key && currentId !== id) {
+                rows.delete(currentId);
+              }
+            }
+            rows.set(id, {
+              id,
+              kind,
+              object_key,
+              name,
+              content_type,
+              size,
+              created_at,
+              source,
+              source_ref,
+              updated_at,
+            });
+            return { meta: { changes: 1 } };
+          }
+          if (/UPDATE material_assets/.test(query)) {
+            const [name, updated_at, id] = values;
+            const row = rows.get(id);
+            if (row) rows.set(id, { ...row, name, updated_at });
+            return { meta: { changes: row ? 1 : 0 } };
+          }
+          if (/DELETE FROM material_assets/.test(query)) {
+            return { meta: { changes: rows.delete(values[0]) ? 1 : 0 } };
+          }
+          throw new Error(`Unsupported material DB query: ${query}`);
+        },
+      };
+    },
+  };
+}
+
+function restoreEnv(name, value) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
 }
 
 test("server-renders the Ark demonstration platform", async () => {
@@ -39,15 +116,25 @@ test("server-renders the Ark demonstration platform", async () => {
     html,
     /property="og:image" content="http:\/\/localhost:3001\/og-llm-trends\.png"/,
   );
-  assert.match(html, /演示工作台/);
   assert.match(html, /模板资产库/);
-  assert.match(html, /Seedream 演示/);
+  assert.match(html, /Seedance/);
+  assert.match(html, /Seedream/);
   assert.match(html, /Managed Agents/);
   assert.match(html, /LLM 趋势/);
   assert.match(html, /AI coding/);
   assert.match(html, /顶级栏目/);
   assert.match(html, /全链路 API 演示控制台/);
   assert.equal((html.match(/data-short-label=/g) ?? []).length, 7);
+  assert.ok(
+    html.indexOf('data-testid="workspace-templates"') <
+      html.indexOf('data-testid="workspace-seedance"'),
+    "the template library should be the first top-level studio",
+  );
+  assert.ok(
+    html.indexOf('data-testid="workspace-seedance"') <
+      html.indexOf('data-testid="workspace-seedream"'),
+    "Seedance should appear before Seedream",
+  );
   assert.ok(
     html.indexOf('data-testid="workspace-responses"') <
       html.indexOf('data-testid="workspace-managed-agents"'),
@@ -549,16 +636,54 @@ test("keeps Seedream prompt optimization explicit, masked, and locally logged", 
   );
 
   assert.match(source, /\/api\/seedream\/optimize-prompt/);
-  assert.match(source, /\/api\/seedream\/generate/);
+  assert.match(source, /\/api\/seedream\/jobs/);
+  assert.match(source, /先填写 API Key 后优化/);
+  assert.match(source, /Bearer 未填写/);
+  assert.match(source, /focusApiKey/);
   assert.match(source, /seedance-workbench:demo-credentials:v1/);
   assert.match(source, /seedream-workbench:history:v1/);
-  assert.match(source, /authorization: `Bearer \$\{maskApiKey\(apiKey\)\}`/);
+  assert.match(source, /seedream-workbench:pending-job:v1/);
+  assert.match(source, /本浏览器会自动恢复进度/);
+  assert.match(source, /apiKey\.trim\(\)/);
+  assert.match(source, /`Bearer \$\{maskApiKey\(apiKey\)\}`/);
   assert.match(source, /costConfirmed/);
   assert.match(source, /applyApiDraft/);
-  assert.match(source, /consumeSeedreamStream/);
+  assert.match(source, /resumeToken/);
   assert.match(exampleSource, /SEEDREAM_EXAMPLES/);
   assert.equal((exampleSource.match(/index: "\d\d"/g) ?? []).length, 10);
   assert.doesNotMatch(exampleSource, /故事书|连环画/);
+});
+
+test("keeps Seedream generation recoverable without persisting credentials", async () => {
+  const jobSource = await readFile(
+    new URL("../app/lib/seedream-jobs-server.ts", import.meta.url),
+    "utf8",
+  );
+  const routeSource = await readFile(
+    new URL("../app/api/seedream/jobs/route.ts", import.meta.url),
+    "utf8",
+  );
+  const schema = await readFile(
+    new URL("../drizzle/0000_gorgeous_gambit.sql", import.meta.url),
+    "utf8",
+  );
+  const hosting = JSON.parse(
+    await readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
+  );
+
+  assert.equal(hosting.d1, "DB");
+  assert.match(schema, /CREATE TABLE `seedream_jobs`/);
+  assert.match(schema, /`resume_token_hash` text NOT NULL/);
+  assert.match(jobSource, /status = 'running'/);
+  assert.match(jobSource, /status = 'pending'/);
+  assert.match(jobSource, /executeSeedreamJob/);
+  assert.match(jobSource, /JOB_TTL_SECONDS = 24 \* 60 \* 60/);
+  assert.match(jobSource, /response_format=url/);
+  assert.match(routeSource, /createSeedreamJob/);
+  assert.match(routeSource, /runSeedreamJob/);
+  assert.match(routeSource, /getSeedreamJob/);
+  assert.doesNotMatch(jobSource, /\bafter\(/);
+  assert.doesNotMatch(schema, /api_key|prompt|request_json/i);
 });
 
 test("server-renders the editable Managed Agents three-step workbench", async () => {
@@ -797,6 +922,64 @@ test("server-renders the four-category template asset library", async () => {
   assert.match(html, /8 秒/);
   assert.match(html, /工作台预置案例/);
   assert.match(html, /火山方舟提示词指南/);
+  assert.match(html, /模板与素材/);
+  assert.match(html, /asset-section-templates/);
+  assert.match(html, /asset-section-materials/);
+});
+
+test("keeps a local material cache while using the persistent catalog", async () => {
+  const librarySource = await readFile(
+    new URL("../app/components/TemplateAssetLibrary.tsx", import.meta.url),
+    "utf8",
+  );
+  const materialSource = await readFile(
+    new URL("../app/lib/material-assets.ts", import.meta.url),
+    "utf8",
+  );
+  const indexSource = await readFile(
+    new URL("../app/lib/material-index-server.ts", import.meta.url),
+    "utf8",
+  );
+  const migration = await readFile(
+    new URL("../drizzle/0001_curvy_doctor_doom.sql", import.meta.url),
+    "utf8",
+  );
+  const styles = await readFile(
+    new URL("../app/globals.css", import.meta.url),
+    "utf8",
+  );
+
+  for (const kind of ["video", "image", "audio"]) {
+    assert.match(librarySource, new RegExp(`id: "${kind}"`));
+    assert.match(librarySource, new RegExp(`material-kind-\\$\\{kind\\.id\\}`));
+  }
+  assert.match(librarySource, /uploadManualMaterial/);
+  assert.match(librarySource, /<video[\s\S]*?controls/);
+  assert.match(librarySource, /<audio[\s\S]*?controls/);
+  assert.match(librarySource, /<img[\s\S]*?alt=/);
+  assert.match(librarySource, /修改名称/);
+  assert.match(librarySource, /复制 URL/);
+  assert.match(librarySource, /确认删除/);
+  assert.match(librarySource, /deleteMaterialAsset/);
+  assert.match(librarySource, /loadMaterialAssets/);
+  assert.match(librarySource, /refreshPreviewAfterError/);
+  assert.match(librarySource, /renameMaterialAsset/);
+  assert.match(materialSource, /template-material-library:v1/);
+  assert.match(materialSource, /window\.localStorage/);
+  assert.match(materialSource, /export async function renameMaterialAsset/);
+  assert.match(materialSource, /export async function deleteMaterialAsset/);
+  assert.match(materialSource, /fetch\("\/api\/materials"/);
+  assert.match(materialSource, /export async function materialTosUrl/);
+  assert.match(materialSource, /response=json/);
+  assert.doesNotMatch(materialSource, /sourceValue.*localStorage/s);
+  assert.match(styles, /repeat\(auto-fill, minmax\(260px, 1fr\)\)/);
+  assert.match(styles, /\.material-card\s*\{[^}]*aspect-ratio: 4 \/ 3/s);
+  assert.match(styles, /\.material-preview img\s*\{[^}]*object-fit: cover/s);
+  assert.match(indexSource, /listTosMaterialAssets/);
+  assert.match(indexSource, /deleteTosMaterialObject/);
+  assert.match(indexSource, /ON CONFLICT\(object_key\)/);
+  assert.match(migration, /CREATE TABLE `material_assets`/);
+  assert.match(migration, /idx_material_assets_object_key/);
 });
 
 test("keeps template application on the existing task runner path", async () => {
@@ -810,7 +993,7 @@ test("keeps template application on the existing task runner path", async () => 
   );
 
   assert.match(librarySource, /APPLY_EXAMPLE_EVENT/);
-  assert.match(librarySource, /navigateWorkspace\("workbench"\)/);
+  assert.match(librarySource, /navigateWorkspace\("seedance"\)/);
   assert.doesNotMatch(librarySource, /fetch\(/);
   assert.equal((assetSource.match(/runnableExample:/g) ?? []).length, 10);
   assert.match(assetSource, /template-commerce-cloud-cream/);
@@ -834,6 +1017,474 @@ test("does not embed an API key in server HTML or the example environment", asyn
   assert.doesNotMatch(html, /NEXT_PUBLIC_(?:ARK|AGENT)_API_KEY/);
   assert.match(envExample, /^AGENT_API_KEY=$/m);
   assert.doesNotMatch(envExample, /^AGENT_API_KEY=.+$/m);
+  assert.match(envExample, /^VOLC_ACCESS_KEY=$/m);
+  assert.match(envExample, /^VOLC_SECRET_KEY=$/m);
+  assert.doesNotMatch(envExample, /^VOLC_(?:ACCESS|SECRET)_KEY=.+$/m);
+});
+
+test("imports, uploads, and previews private TOS materials through signed routes", async () => {
+  const originalFetch = globalThis.fetch;
+  const previous = {
+    access: process.env.VOLC_ACCESS_KEY,
+    secret: process.env.VOLC_SECRET_KEY,
+    bucket: process.env.TOS_BUCKET,
+    endpoint: process.env.TOS_ENDPOINT,
+    region: process.env.TOS_REGION,
+    prefix: process.env.TOS_PREFIX,
+  };
+  process.env.VOLC_ACCESS_KEY = "test-access-key-not-real";
+  process.env.VOLC_SECRET_KEY = "test-secret-key-not-real";
+  process.env.TOS_BUCKET = "hh-tos-test";
+  process.env.TOS_ENDPOINT = "https://hh-tos-test.tos-cn-beijing.volces.com";
+  process.env.TOS_REGION = "cn-beijing";
+  process.env.TOS_PREFIX = "demo/";
+  const upstreamRequests = [];
+  const materialDb = createMaterialDatabase();
+  const bindings = { DB: materialDb };
+  globalThis.__WORKBENCH_MATERIAL_TEST_DATABASE__ = materialDb;
+  const tosObjects = new Map();
+  let failedDeleteKey = "";
+  let failedList = false;
+  let emptyList = false;
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    upstreamRequests.push({ url, init });
+    if (url === "https://generated.example.com/image.png") {
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        headers: { "content-type": "image/png", "content-length": "4" },
+      });
+    }
+    assert.match(url, /^https:\/\/hh-tos-test\.tos-cn-beijing\.volces\.com\//);
+    assert.equal(init.redirect, "manual");
+    const parsed = new URL(url);
+    const key = decodeURIComponent(parsed.pathname.slice(1));
+    if (init.method === "GET" && parsed.searchParams.get("list-type") === "2") {
+      const headers = new Headers(init.headers);
+      assert.match(
+        headers.get("authorization") ?? "",
+        /^TOS4-HMAC-SHA256 Credential=.*SignedHeaders=host;x-tos-content-sha256;x-tos-date,Signature=[a-f0-9]{64}$/,
+      );
+      assert.match(headers.get("x-tos-date") ?? "", /^\d{8}T\d{6}Z$/);
+      assert.equal(
+        headers.get("x-tos-content-sha256"),
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      );
+      assert.equal(parsed.searchParams.has("X-Tos-Signature"), false);
+      if (failedList) {
+        return new Response(
+          "<Error><Code>AccessDenied</Code></Error>",
+          { status: 403, headers: { "x-tos-request-id": "test-list-denied" } },
+        );
+      }
+      const prefix = parsed.searchParams.get("prefix") ?? "";
+      const contents = [...tosObjects.values()]
+        .filter((object) => !emptyList && object.key.startsWith(prefix))
+        .map((object) => ({
+          Key: object.key,
+          LastModified: object.lastModified,
+          Size: object.size,
+        }));
+      return Response.json({ Contents: contents, IsTruncated: false });
+    }
+    assert.match(url, /X-Tos-Algorithm=TOS4-HMAC-SHA256/);
+    assert.match(url, /X-Tos-Content-Sha256=UNSIGNED-PAYLOAD/);
+    assert.match(url, /X-Tos-Signature=[a-f0-9]{64}/);
+    if (init.method === "PUT") {
+      tosObjects.set(key, {
+        key,
+        lastModified: "2026-08-06T01:02:03.000Z",
+        size: init.body instanceof Uint8Array ? init.body.byteLength : 4,
+      });
+      return new Response(null, { status: 200 });
+    }
+    if (init.method === "HEAD") {
+      const object = tosObjects.get(key);
+      if (!object) return new Response(null, { status: 404 });
+      let contentType = "application/octet-stream";
+      if (key.endsWith(".png")) contentType = "image/png";
+      if (key.endsWith(".jpeg") || key.endsWith(".jpg")) {
+        contentType = "image/jpeg";
+      }
+      if (key.endsWith(".mp3")) contentType = "audio/mpeg";
+      if (key.endsWith(".mp4")) contentType = "video/mp4";
+      return new Response(null, {
+        status: 200,
+        headers: {
+          "content-type": contentType,
+          "content-length": String(object.size),
+        },
+      });
+    }
+    if (init.method === "DELETE") {
+      if (key === failedDeleteKey) {
+        return new Response(null, {
+          status: 503,
+          headers: { "x-tos-request-id": "test-delete-failure" },
+        });
+      }
+      tosObjects.delete(key);
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(`Unexpected TOS request: ${init.method} ${url}`);
+  };
+
+  try {
+    const imported = await request(
+      "/api/materials/import",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "image",
+          source: "seedream",
+          sourceRef: "seedream:test-run:0",
+          sourceValue: "https://generated.example.com/image.png",
+          name: "测试图片.png",
+        }),
+      },
+      bindings,
+    );
+    assert.equal(imported.status, 201, await imported.clone().text());
+    const importedAsset = await imported.json();
+    assert.equal(importedAsset.kind, "image");
+    assert.equal(importedAsset.source, "seedream");
+    assert.equal(importedAsset.size, 4);
+    assert.match(importedAsset.objectKey, /^demo\/image\/generated\/[a-f0-9]{64}\.png$/);
+    assert.equal("sourceValue" in importedAsset, false);
+    assert.ok(
+      upstreamRequests[1].init.body instanceof Uint8Array,
+      "generated images should use a fixed-length binary body for TOS",
+    );
+
+    const uploadedImage = await request(
+      "/api/materials/upload?kind=image&name=manual.png",
+      {
+        method: "POST",
+        headers: { "content-type": "image/png", "content-length": "4" },
+        body: new Uint8Array([137, 80, 78, 71]),
+      },
+      bindings,
+    );
+    assert.equal(uploadedImage.status, 201);
+    assert.ok(
+      upstreamRequests.at(-1).init.body instanceof Uint8Array,
+      "manual images should use a fixed-length binary body for TOS",
+    );
+
+    const uploaded = await request(
+      "/api/materials/upload?kind=audio&name=folder%5Csample.mp3",
+      {
+        method: "POST",
+        headers: { "content-type": "audio/mpeg", "content-length": "4" },
+        body: new Uint8Array([73, 68, 51, 4]),
+      },
+      bindings,
+    );
+    assert.equal(uploaded.status, 201);
+    const uploadedAsset = await uploaded.json();
+    assert.equal(uploadedAsset.kind, "audio");
+    assert.equal(uploadedAsset.size, 4);
+    assert.match(
+      uploadedAsset.objectKey,
+      /^demo\/audio\/uploads\/\d{8}\/[a-f0-9-]+-folder-sample\.mp3$/,
+    );
+
+    const preview = await request(
+      `/api/materials/object?key=${encodeURIComponent(importedAsset.objectKey)}`,
+    );
+    assert.equal(preview.status, 302);
+    assert.match(
+      preview.headers.get("location") ?? "",
+      /X-Tos-Expires=3600.*X-Tos-Signature=/,
+    );
+    assert.equal(preview.headers.get("cache-control"), "no-store");
+
+    const tosUrlResponse = await request(
+      `/api/materials/object?key=${encodeURIComponent(importedAsset.objectKey)}&response=json`,
+    );
+    assert.equal(tosUrlResponse.status, 200);
+    const tosUrlPayload = await tosUrlResponse.json();
+    assert.match(
+      tosUrlPayload.url,
+      /^https:\/\/hh-tos-test\.tos-cn-beijing\.volces\.com\/demo\/.*X-Tos-Expires=3600.*X-Tos-Signature=/,
+    );
+    assert.equal(tosUrlPayload.expiresIn, 3_600);
+    assert.equal(tosUrlResponse.headers.get("cache-control"), "no-store");
+
+    const legacyVideoKey =
+      "demo/video/uploads/20260805/11111111-1111-4111-8111-111111111111-yesterday.mp4";
+    tosObjects.set(legacyVideoKey, {
+      key: legacyVideoKey,
+      lastModified: "2026-08-05T06:07:08.000Z",
+      size: 128,
+    });
+    const catalog = await request("/api/materials", undefined, bindings);
+    assert.equal(catalog.status, 200);
+    const catalogPayload = await catalog.json();
+    assert.equal(catalogPayload.assets.length, 4);
+    assert.ok(
+      catalogPayload.assets.some(
+        (asset) => asset.objectKey === legacyVideoKey && asset.name === "yesterday.mp4",
+      ),
+      "legacy TOS objects should be recovered into the persistent index",
+    );
+
+    const cachedImageKey =
+      "demo/image/uploads/20260805/22222222-2222-4222-8222-222222222222-cached.png";
+    tosObjects.set(cachedImageKey, {
+      key: cachedImageKey,
+      lastModified: "2026-08-05T07:08:09.000Z",
+      size: 256,
+    });
+    const restoredCache = await request(
+      "/api/materials",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          assets: [
+            {
+              id: "manual-22222222-2222-4222-8222-222222222222",
+              kind: "image",
+              objectKey: cachedImageKey,
+              name: "cached.png",
+              contentType: "image/png",
+              size: 1,
+              createdAt: "2026-08-05T07:08:09.000Z",
+              source: "manual",
+              sourceRef: "manual:22222222-2222-4222-8222-222222222222",
+            },
+          ],
+        }),
+      },
+      bindings,
+    );
+    assert.equal(restoredCache.status, 200, await restoredCache.clone().text());
+    const restoredPayload = await restoredCache.json();
+    assert.equal(restoredPayload.skipped, 0);
+    assert.ok(
+      restoredPayload.assets.some(
+        (asset) => asset.objectKey === cachedImageKey && asset.size === 256,
+      ),
+      "a verified browser cache entry should seed the D1 index",
+    );
+
+    failedList = true;
+    const degradedCatalog = await request("/api/materials", undefined, bindings);
+    assert.equal(degradedCatalog.status, 200);
+    const degradedPayload = await degradedCatalog.json();
+    assert.match(degradedPayload.warning, /HTTP 403.*tos:ListBucket/);
+    assert.ok(
+      degradedPayload.assets.some((asset) => asset.objectKey === cachedImageKey),
+      "a denied TOS listing must retain indexed materials",
+    );
+    failedList = false;
+
+    emptyList = true;
+    const incompleteCatalog = await request("/api/materials", undefined, bindings);
+    assert.equal(incompleteCatalog.status, 200);
+    assert.ok(
+      (await incompleteCatalog.json()).assets.some(
+        (asset) => asset.objectKey === cachedImageKey,
+      ),
+      "an empty listing must not remove an indexed object that still passes HEAD",
+    );
+    emptyList = false;
+
+    const renamed = await request(
+      "/api/materials",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: importedAsset.id, name: "长期图片.png" }),
+      },
+      bindings,
+    );
+    assert.equal(renamed.status, 200);
+    assert.equal((await renamed.json()).name, "长期图片.png");
+
+    const missingConfirmation = await request(
+      "/api/materials",
+      {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: importedAsset.id, confirmed: false }),
+      },
+      bindings,
+    );
+    assert.equal(missingConfirmation.status, 400);
+    assert.match(await missingConfirmation.text(), /不可逆确认/);
+
+    const deleted = await request(
+      "/api/materials",
+      {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: importedAsset.id, confirmed: true }),
+      },
+      bindings,
+    );
+    assert.equal(deleted.status, 200);
+    assert.equal((await deleted.json()).deleted, true);
+    assert.equal(tosObjects.has(importedAsset.objectKey), false);
+    assert.ok(
+      upstreamRequests.some(
+        ({ url, init }) =>
+          init.method === "DELETE" &&
+          decodeURIComponent(new URL(url).pathname.slice(1)) ===
+            importedAsset.objectKey,
+      ),
+    );
+
+    const repeatedDelete = await request(
+      "/api/materials",
+      {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: importedAsset.id, confirmed: true }),
+      },
+      bindings,
+    );
+    assert.equal(repeatedDelete.status, 200);
+    assert.equal((await repeatedDelete.json()).alreadyMissing, true);
+
+    failedDeleteKey = uploadedAsset.objectKey;
+    const failedDelete = await request(
+      "/api/materials",
+      {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: uploadedAsset.id, confirmed: true }),
+      },
+      bindings,
+    );
+    assert.equal(failedDelete.status, 502);
+    assert.match(await failedDelete.text(), /TOS 素材删除失败/);
+    assert.equal(tosObjects.has(uploadedAsset.objectKey), true);
+    failedDeleteKey = "";
+    const afterFailedDelete = await request("/api/materials", undefined, bindings);
+    assert.ok(
+      (await afterFailedDelete.json()).assets.some(
+        (asset) => asset.id === uploadedAsset.id,
+      ),
+      "a failed TOS deletion must keep the persistent catalog entry",
+    );
+  } finally {
+    delete globalThis.__WORKBENCH_MATERIAL_TEST_DATABASE__;
+    globalThis.fetch = originalFetch;
+    restoreEnv("VOLC_ACCESS_KEY", previous.access);
+    restoreEnv("VOLC_SECRET_KEY", previous.secret);
+    restoreEnv("TOS_BUCKET", previous.bucket);
+    restoreEnv("TOS_ENDPOINT", previous.endpoint);
+    restoreEnv("TOS_REGION", previous.region);
+    restoreEnv("TOS_PREFIX", previous.prefix);
+  }
+});
+
+test("rejects unsafe material inputs before writing to TOS", async () => {
+  const originalFetch = globalThis.fetch;
+  const previousAccess = process.env.VOLC_ACCESS_KEY;
+  const previousSecret = process.env.VOLC_SECRET_KEY;
+  process.env.VOLC_ACCESS_KEY = "test-access-key-not-real";
+  process.env.VOLC_SECRET_KEY = "test-secret-key-not-real";
+  globalThis.fetch = async () =>
+    new Response(null, {
+      status: 302,
+      headers: { location: "https://127.0.0.1/redirected.png" },
+    });
+  try {
+    const privateImport = await request("/api/materials/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "image",
+        source: "seedream",
+        sourceRef: "unsafe",
+        sourceValue: "https://127.0.0.1/private.png",
+        name: "private.png",
+      }),
+    });
+    assert.equal(privateImport.status, 400);
+    assert.match(await privateImport.text(), /公网 HTTPS URL/);
+
+    const privateRedirect = await request("/api/materials/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "image",
+        source: "seedream",
+        sourceRef: "unsafe-redirect",
+        sourceValue: "https://generated.example.com/redirect.png",
+        name: "redirect.png",
+      }),
+    });
+    assert.equal(privateRedirect.status, 400);
+    assert.match(await privateRedirect.text(), /公网 HTTPS URL/);
+
+    const wrongMime = await request(
+      "/api/materials/upload?kind=image&name=wrong.png",
+      {
+        method: "POST",
+        headers: { "content-type": "audio/mpeg" },
+        body: new Uint8Array([1]),
+      },
+    );
+    assert.equal(wrongMime.status, 400);
+    assert.match(await wrongMime.text(), /MIME/);
+
+    const spoofedMime = await request(
+      "/api/materials/upload?kind=image&name=spoofed.png",
+      {
+        method: "POST",
+        headers: { "content-type": "image/png" },
+        body: new Uint8Array([1, 2, 3, 4]),
+      },
+    );
+    assert.equal(spoofedMime.status, 400);
+    assert.match(await spoofedMime.text(), /文件内容.*MIME/);
+
+    const oversized = await request(
+      "/api/materials/upload?kind=image&name=oversized.png",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "image/png",
+          "content-length": String(20 * 1024 * 1024 + 1),
+        },
+        body: new Uint8Array([137, 80, 78, 71]),
+      },
+    );
+    assert.equal(oversized.status, 400);
+    assert.match(await oversized.text(), /20 MB/);
+
+    const traversal = await request(
+      `/api/materials/object?key=${encodeURIComponent("demo/../secret.txt")}`,
+    );
+    assert.equal(traversal.status, 400);
+    assert.match(await traversal.text(), /demo\//);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv("VOLC_ACCESS_KEY", previousAccess);
+    restoreEnv("VOLC_SECRET_KEY", previousSecret);
+  }
+});
+
+test("fails closed when TOS server credentials are missing", async () => {
+  const previousAccess = process.env.VOLC_ACCESS_KEY;
+  const previousSecret = process.env.VOLC_SECRET_KEY;
+  delete process.env.VOLC_ACCESS_KEY;
+  delete process.env.VOLC_SECRET_KEY;
+  try {
+    const response = await request(
+      `/api/materials/object?key=${encodeURIComponent("demo/image/generated/test.png")}`,
+    );
+    assert.equal(response.status, 502);
+    assert.match(await response.text(), /服务端凭证未配置/);
+  } finally {
+    restoreEnv("VOLC_ACCESS_KEY", previousAccess);
+    restoreEnv("VOLC_SECRET_KEY", previousSecret);
+  }
 });
 
 test("persists task logs and repeats polling while a task remains active", async () => {
