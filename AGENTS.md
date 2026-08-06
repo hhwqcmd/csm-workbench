@@ -14,14 +14,14 @@
 
 官方 Python 快速示例作为协议和素材基线独立保留，不是产品页面主线。页面不得重新加入共学进度、环境安装步骤或教程路线。
 
-当前事实（最后核对：2026-08-05）：
+当前事实（最后核对：2026-08-06）：
 
 - 默认连接为标准官方 API + `doubao-seedance-2-0-mini-260615`，同时支持 Agent Plan 套餐通道。
-- 生产 Sites 项目使用 `.openai/hosting.json` 中既有 `project_id`，访问策略为公开直达。
+- 项目处于测试阶段，只在本地开发、调试和运行。`.openai/hosting.json` 保留既有 Sites `project_id` 作为历史关联，但短期内不得保存或部署新版本；既有站点已收紧为仅项目所有者可访问。
 - 应用入口不要求登录；`app/chatgpt-auth.ts` 是未被引用的托管认证遗留代码，不得据此重新接回登录。
 - 任务历史和演示凭证只保存在当前浏览器，不是跨设备或服务端审计记录；Seedream 仅把活跃任务状态、脱敏错误和 URL 格式结果暂存 D1 24 小时用于刷新恢复，不保存 API Key、Prompt 或完整请求。
-- TOS 素材文件使用固定 `demo/` 前缀；素材索引只保存在当前浏览器，不使用 D1/R2，也不从 TOS 反向列举。
-- 生产站公开直达，素材保存与手动上传接口按已确认方案不做写鉴权；输入校验不能消除公开写入带来的存储、流量与滥用风险。
+- TOS 素材文件使用固定 `demo/` 前缀；D1 保存长期素材索引，页面读取时仅反向列举 `demo/{video|image|audio}/` 补建历史对象。浏览器 `localStorage` 只是最多 500 条的可丢弃缓存；旧缓存仅在 TOS HEAD 校验对象存在后补写 D1。
+- 本地素材保存与手动上传接口仍不做应用内写鉴权；执行真实上传仍会产生 TOS 存储与流量费用。既有 Sites 版本不作为当前测试基线。
 
 ## 模块地图
 
@@ -42,13 +42,13 @@
 - `app/lib/seedance-server.ts`：服务端白名单校验、上游请求、响应归一化和错误脱敏。
 - `app/api/seedance/tasks/route.ts`、`status/route.ts`：创建与查询的同源服务端入口。
 - `app/lib/seedance-examples.ts`、`SeedanceExampleGallery.tsx`：八个官方示例及连续生成计划。
-- `app/lib/template-assets.ts`、`TemplateAssetLibrary.tsx`：四类模板、十个场景预填案例，以及视频/图片/音频素材的本机索引、预览和手动上传。
-- `app/lib/material-assets.ts`、`app/lib/materials-server.ts`、`app/api/materials/`：素材元数据契约、本地存储、固定 TOS 配置、TOS4 签名、远程结果导入、文件上传和私有对象临时预览。
+- `app/lib/template-assets.ts`、`TemplateAssetLibrary.tsx`：四类模板、十个场景预填案例，以及视频/图片/音频素材的持久索引、预览、改名、删除和手动上传。
+- `app/lib/material-assets.ts`、`app/lib/materials-server.ts`、`app/lib/material-index-server.ts`、`app/api/materials/`：素材元数据契约、本地缓存、D1 持久索引、固定 TOS 配置、TOS4 签名、历史恢复、上传、临时预览、改名和同步删除。
 - `app/globals.css`、`app/layout.tsx`：视觉规则、响应式布局和站点元数据。
 - `official-quickstart/`：官方 Python 基线；关键入口为 `python/demo_standard.py`。
 - `start_workbench.sh`：本地启动与环境检查，不安装依赖、不打开浏览器、不调用真实 API。
 - `worker/`、`build/`、`vite.config.ts`：vinext/Cloudflare Worker 适配层。
-- `db/`、`drizzle/`：Seedream 短期后台任务的 D1 schema 与迁移；`examples/d1/` 仍为样例。
+- `db/`、`drizzle/`：Seedream 短期后台任务与素材长期索引的 D1 schema 和迁移；`examples/d1/` 仍为样例。
 - `tests/rendered-html.test.mjs`：页面契约、服务端边界和安全回归测试。
 
 核心依赖方向：
@@ -61,7 +61,7 @@
 
 `SeedreamWorkbench → /api/seedream/jobs → D1 短期任务状态 → seedream-server → 火山方舟 Image generation API`
 
-`Seedance / Seedream / TemplateAssetLibrary → /api/materials/* → 私有 TOS demo/ → 浏览器本机素材索引`
+`Seedance / Seedream / TemplateAssetLibrary → /api/materials/* → 私有 TOS demo/ + D1 素材索引 → 浏览器本机缓存`
 
 `official-quickstart → volcenginesdkarkruntime → 火山方舟 API`
 
@@ -127,15 +127,16 @@
 - 环境依赖包只开放 `apt`、`cargo`、`gem`、`go`、`npm`、`pip` 六类；`config.env` 键名不得使用 `ARK_` 或 `VOLC_` 保留前缀。`scope` 仅为兼容性预留，不应解释为已启用的隔离能力。
 - 环境不提供版本机制；需要修改定义时创建新环境并更新后续 Session 的 `environment_id`。每个 Session 仍拥有隔离沙箱和文件系统。
 - 模板缺少素材时用空 URL 表达并显示“素材待补”；所有 URL 补齐前执行按钮必须禁用。
-- TOS AK/SK 只能来自服务端环境变量；不得进入 `NEXT_PUBLIC_*`、浏览器、本机素材索引、源码、日志或错误响应。`.env.example` 只保留空凭证占位。
+- TOS AK/SK 只能来自服务端环境变量；不得进入 `NEXT_PUBLIC_*`、浏览器缓存、D1 素材索引、源码、日志或错误响应。`.env.example` 只保留空凭证占位。
 - 素材接口只允许固定 bucket、北京 Region、bucket Endpoint 和 `demo/` 前缀；对象键不得包含路径穿越，远程结果必须是公网 HTTPS，重定向逐跳复验。
 - 图片、音频、视频默认分别限制为 20 MB、50 MB、200 MB；MIME 必须与素材类型匹配。自动化测试只使用模拟 TOS，不得真实上传。
-- 清空浏览器素材索引不会删除 TOS 对象；当前产品不提供删除、TOS 反向扫描、跨设备同步或账号级素材隔离。
+- 素材库加载只允许使用服务端 Header 签名分页列举 `demo/{video|image|audio}/` 并补建 D1；缺少 `tos:ListBucket` 时保留 D1/本机缓存并明确告警，目录缺项也必须经 HEAD 404 复核后才能清理索引。预签名 URL 有效期 1 小时且不得持久化，媒体失败时才重新签名。
+- 素材删除必须由卡片二次确认显式触发；服务端从 D1 取对象键，先删除 TOS 再删除索引。测试不得调用真实删除。当前不提供账号级素材隔离，恢复 Sites 发布前必须重新评估无鉴权的列举与删除接口。
 
 ## 地雷与遗留区域
 
 - `app/chatgpt-auth.ts` 当前未被引用。它是平台认证模板遗留，不代表站点需要登录；除非明确重新设计访问控制，否则不要接入或扩展。
-- `db/`、`drizzle/`、`examples/d1/` 尚未启用。当前本地历史不需要数据库。
+- `db/`、`drizzle/` 已用于 Seedream 短期任务与素材长期索引；新增表必须生成并应用迁移。`examples/d1/` 仍只是样例。
 - `official-quickstart/python/preview.html` 会被官方脚本覆盖。
 - `setup_mac.sh` 会创建或更新 `.venv` 和 `run_demo.sh`；运行后检查生成内容，不要自动接着运行示例。
 - 官方 Python 示例未显式设置 Agent Plan Base URL，不能直接配 Agent Plan Key 使用。
@@ -165,12 +166,12 @@ git diff --check
 
 `npm test` 已包含构建；无需在它之前重复运行 `npm run build`。测试使用模拟上游，不能使用真实 Key。真实 API 验证必须取得用户对账号、额度、凭证和请求摘要的确认，并把结果记入 `docs/validation-log.md`。
 
-## Sites 发布
+## Sites 暂停发布
 
-- 始终复用 `.openai/hosting.json` 的既有项目，不创建或替换站点 ID。
-- 发布前必须完成验证并提交准确源码；推送的分支头、保存版本的 `commit_sha` 和打包产物必须来自同一状态。
-- 当前站点为公开访问；部署新版本属于公开生产发布，必须遵循 Sites 的公开部署审批要求。
-- 访问模式是 Sites 外部状态，不写入或伪造在 `.openai/hosting.json`。若访问策略变化，同步更新本文件的“当前事实”。
+- 当前阶段只允许本地开发、调试和验证；不得创建 Sites 保存版本、部署版本或更新托管环境。
+- `.openai/hosting.json` 的既有项目 ID 仅作历史关联，不删除、不替换，也不代表需要继续发布。
+- 既有 Sites 版本已收紧为仅项目所有者可访问，不作为当前功能或回归测试基线。
+- 只有用户后续明确恢复 Sites 发布时，才重新执行完整验证、源码提交、版本保存和部署审批流程，并保证提交 SHA 与构建产物一致。
 
 ## 提交规范
 

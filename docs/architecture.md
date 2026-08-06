@@ -54,7 +54,8 @@ Seedance / Seedream / TemplateAssetLibrary
   → POST /api/materials/import 或 /api/materials/upload
   → app/lib/materials-server.ts（固定配置、输入校验、TOS4 签名）
   → 私有 TOS demo/{video|image|audio}/
-  → 浏览器 localStorage 元数据索引
+  → D1 material_assets 长期索引，localStorage 仅作可丢弃缓存
+  → /api/materials 分页列举 TOS 补建历史索引、校验迁移浏览器缓存、持久改名与同步删除
   → GET /api/materials/object 临时签名预览
 
 LLM 趋势路径
@@ -149,7 +150,7 @@ AI coding 路径
 - Managed Agents 资源与事件 API 固定在标准 `/api/v3`；Agent Plan 地址不开放给该模块。
 - Seedream 图片生成与 Prompt 优化固定在标准 `/api/v3`；页面加载、示例切换和自动化测试不会产生图片或文本模型调用。刷新只使用匿名令牌查询已创建任务，不会重复创建计费请求。
 - Responses API 创建、检索、Input Items 和删除固定在标准 `/api/v3`；真实创建与工具调用需要费用确认，永久删除需要单独确认，页面加载和自动化测试不会产生真实调用。
-- 素材保存和上传是独立显式操作，不会再次调用 Seedance 或 Seedream。生产写接口当前无身份鉴权，公开访客可产生真实 TOS 费用；固定路径、大小、MIME 与 SSRF 校验只限制请求形态。
+- 素材保存、上传和删除是独立显式操作，不会再次调用 Seedance 或 Seedream。素材列表使用服务端 Header 签名，只列举固定 `demo/` 三类前缀，兼容 TOS 原生 JSON 与 XML 响应并与 D1 对账；目录缺项须经 HEAD 404 复核后才能清理索引，旧浏览器缓存也只在服务端 HEAD 校验对象后补写 D1。缺少 `tos:ListBucket` 时列表降级返回 D1/缓存并明确告警；预签名 URL 不持久化。当前仅在本地测试，写入、列举和删除接口仍无应用内身份鉴权并可能产生真实 TOS 费用；固定路径、大小、MIME 与 SSRF 校验只限制请求形态。既有 Sites 版本已限制为仅项目所有者访问，短期内不再更新。
 - LLM 趋势不接收 Key、不调用任何模型或榜单 API；来源链接只在用户主动点击后打开厂商或第三方页面。
 - AI coding 指标接口只读取代码库中的模拟快照；页面加载只会发起同源只读 GET，不请求外部系统，也不收集开发者、仓库或会话级真实数据。
 - 真实“创建任务”是外部写操作且可能产生费用，不与页面加载或普通测试绑定。

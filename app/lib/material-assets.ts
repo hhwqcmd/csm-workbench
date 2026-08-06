@@ -45,19 +45,142 @@ export function storeMaterialAsset(asset: MaterialAsset): MaterialAsset[] {
         !(item.kind === asset.kind && item.sourceRef === asset.sourceRef),
     ),
   ].slice(0, MAX_LOCAL_ASSETS);
+  return replaceMaterialCache(next);
+}
+
+export async function loadMaterialAssets(): Promise<{
+  assets: MaterialAsset[];
+  warning?: string;
+}> {
+  const cached = readMaterialAssets();
+  let restoreWarning = "";
+  if (cached.length) {
+    try {
+      const restoreResponse = await fetch("/api/materials", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ assets: cached }),
+      });
+      const restorePayload = (await restoreResponse.json()) as {
+        error?: string;
+      };
+      if (!restoreResponse.ok) {
+        restoreWarning =
+          restorePayload.error ?? "本机素材暂时无法写入持久索引。";
+      }
+    } catch {
+      restoreWarning = "本机素材暂时无法写入持久索引。";
+    }
+  }
+
+  const response = await fetch("/api/materials", { cache: "no-store" });
+  const payload = (await response.json()) as {
+    assets?: MaterialAsset[];
+    warning?: string;
+    error?: string;
+  };
+  if (!response.ok || !Array.isArray(payload.assets)) {
+    if (cached.length) {
+      const warning = [restoreWarning, payload.error ?? "读取持久素材索引失败。"]
+        .filter(Boolean)
+        .join(" ");
+      return { assets: cached, warning };
+    }
+    throw new Error(payload.error ?? "读取素材库失败。");
+  }
+  const indexed = payload.assets.filter(isMaterialAsset);
+  const assets = payload.warning
+    ? mergeMaterialAssets(indexed, cached)
+    : indexed;
+  replaceMaterialCache(assets);
+  const warning = [restoreWarning, payload.warning].filter(Boolean).join(" ");
+  return { assets, ...(warning ? { warning } : {}) };
+}
+
+export async function renameMaterialAsset(
+  id: string,
+  name: string,
+): Promise<MaterialAsset> {
+  const nextName = name.trim();
+  if (!nextName) {
+    throw new Error("素材名称不能为空。");
+  }
+  if (nextName.length > 180) {
+    throw new Error("素材名称不能超过 180 个字符。");
+  }
+
+  const response = await fetch("/api/materials", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({ id, name: nextName }),
+  });
+  const payload = (await response.json()) as MaterialAsset & { error?: string };
+  if (!response.ok || !isMaterialAsset(payload)) {
+    throw new Error(payload.error ?? "无法保存新名称。");
+  }
+  storeMaterialAsset(payload);
+  return payload;
+}
+
+export async function deleteMaterialAsset(id: string): Promise<void> {
+  const response = await fetch("/api/materials", {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({ id, confirmed: true }),
+  });
+  const payload = (await response.json()) as {
+    id?: string;
+    deleted?: boolean;
+    error?: string;
+  };
+  if (!response.ok || !payload.deleted) {
+    throw new Error(payload.error ?? "删除素材失败。");
+  }
+  replaceMaterialCache(readMaterialAssets().filter((asset) => asset.id !== id));
+}
+
+export function materialPreviewUrl(objectKey: string): string {
+  return `/api/materials/object?key=${encodeURIComponent(objectKey)}`;
+}
+
+export async function materialTosUrl(objectKey: string): Promise<string> {
+  const response = await fetch(
+    `${materialPreviewUrl(objectKey)}&response=json`,
+    { cache: "no-store" },
+  );
+  const payload = (await response.json()) as { url?: string; error?: string };
+  if (!response.ok || !payload.url) {
+    throw new Error(payload.error ?? "获取 TOS URL 失败。");
+  }
+  return payload.url;
+}
+
+function replaceMaterialCache(assets: MaterialAsset[]): MaterialAsset[] {
+  const next = assets.slice(0, MAX_LOCAL_ASSETS);
   try {
     window.localStorage.setItem(MATERIAL_STORAGE_KEY, JSON.stringify(next));
   } catch {
-    throw new Error(
-      "素材已上传到 TOS，但当前浏览器无法写入本地索引。请检查浏览器存储空间。",
-    );
+    // The server index remains canonical if this optional cache is unavailable.
   }
   window.dispatchEvent(new CustomEvent(MATERIAL_LIBRARY_EVENT));
   return next;
 }
 
-export function materialPreviewUrl(objectKey: string): string {
-  return `/api/materials/object?key=${encodeURIComponent(objectKey)}`;
+function mergeMaterialAssets(
+  primary: MaterialAsset[],
+  fallback: MaterialAsset[],
+): MaterialAsset[] {
+  const seen = new Set<string>();
+  return [...primary, ...fallback]
+    .filter((asset) => {
+      if (seen.has(asset.objectKey)) return false;
+      seen.add(asset.objectKey);
+      return true;
+    })
+    .slice(0, MAX_LOCAL_ASSETS);
 }
 
 export function hasSavedMaterial(

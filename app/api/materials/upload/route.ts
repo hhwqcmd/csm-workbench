@@ -3,6 +3,7 @@ import {
   MaterialsServiceError,
   uploadManualMaterialToTos,
 } from "../../../lib/materials-server";
+import { upsertMaterialAssetIndex } from "../../../lib/material-index-server";
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -12,6 +13,7 @@ export async function POST(request: Request): Promise<Response> {
       url.searchParams.get("kind"),
       url.searchParams.get("name"),
     );
+    await upsertMaterialAssetIndex(asset);
     return Response.json(asset, {
       status: 201,
       headers: { "cache-control": "no-store" },

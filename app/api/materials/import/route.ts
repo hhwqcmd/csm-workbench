@@ -4,11 +4,13 @@ import {
   MaterialsValidationError,
   parseImportMaterialInput,
 } from "../../../lib/materials-server";
+import { upsertMaterialAssetIndex } from "../../../lib/material-index-server";
 
 export async function POST(request: Request): Promise<Response> {
   try {
     const input = parseImportMaterialInput(await request.json());
     const asset = await importGeneratedMaterialToTos(input);
+    await upsertMaterialAssetIndex(asset);
     return Response.json(asset, {
       status: 201,
       headers: { "cache-control": "no-store" },

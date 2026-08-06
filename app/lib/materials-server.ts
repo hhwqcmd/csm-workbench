@@ -27,6 +27,12 @@ type ImportMaterialInput = {
   name: string;
 };
 
+type ListedTosObject = {
+  key: string;
+  lastModified: string;
+  size: number;
+};
+
 const MAX_BYTES: Record<MaterialKind, number> = {
   image: 20 * 1024 * 1024,
   audio: 50 * 1024 * 1024,
@@ -161,6 +167,154 @@ export async function presignedObjectUrl(objectKeyValue: string): Promise<string
   return presign(config, "GET", objectKey, 3_600);
 }
 
+export async function verifyCachedMaterialAsset(
+  value: unknown,
+): Promise<MaterialAsset | null> {
+  const input = exactRecord(value, [
+    "id",
+    "kind",
+    "objectKey",
+    "name",
+    "contentType",
+    "size",
+    "createdAt",
+    "source",
+    "sourceRef",
+  ]);
+  const config = tosConfig();
+  const kind = materialKind(requiredString(input.kind, "素材类型", 10));
+  const objectKey = requiredString(input.objectKey, "对象键", 1_024);
+  assertMaterialObjectKey(config, objectKey);
+  if (!objectKey.startsWith(`${config.prefix}${kind}/`)) {
+    throw new MaterialsValidationError("素材类型与对象路径不一致。");
+  }
+  const id = requiredString(input.id, "素材 ID", 120);
+  const name = requiredString(input.name, "素材名称", 180);
+  const source = input.source;
+  if (source !== "seedance" && source !== "seedream" && source !== "manual") {
+    throw new MaterialsValidationError("素材来源不正确。");
+  }
+  const sourceRef = requiredString(input.sourceRef, "来源标识", 300);
+  const declaredContentType = normalizedContentType(
+    requiredString(input.contentType, "文件 MIME", 120),
+  );
+  extensionFor(kind, declaredContentType);
+  if (!Number.isSafeInteger(input.size) || Number(input.size) < 0) {
+    throw new MaterialsValidationError("素材大小不正确。");
+  }
+  const createdAt = requiredString(input.createdAt, "创建时间", 80);
+  if (Number.isNaN(new Date(createdAt).getTime())) {
+    throw new MaterialsValidationError("素材创建时间不正确。");
+  }
+
+  const url = await presign(config, "HEAD", objectKey, 600);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "HEAD",
+      redirect: "manual",
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch {
+    throw new MaterialsServiceError("TOS 素材校验请求未能发送，请稍后重试。");
+  }
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw await tosResponseError(response, "TOS 素材校验失败");
+  }
+  const responseContentType = normalizedContentType(
+    response.headers.get("content-type") ?? declaredContentType,
+  );
+  extensionFor(kind, responseContentType);
+  const responseSize = optionalContentLength(response.headers.get("content-length"));
+  return {
+    id,
+    kind,
+    objectKey,
+    name,
+    contentType: responseContentType,
+    size: responseSize ?? Number(input.size),
+    createdAt: new Date(createdAt).toISOString(),
+    source,
+    sourceRef,
+  };
+}
+
+export async function listTosMaterialAssets(): Promise<MaterialAsset[]> {
+  const config = tosConfig();
+  const assets: MaterialAsset[] = [];
+  for (const kind of ["video", "image", "audio"] as const) {
+    const prefix = `${config.prefix}${kind}/`;
+    let continuationToken = "";
+    for (let page = 0; page < 100; page += 1) {
+      const query: Record<string, string> = {
+        "list-type": "2",
+        prefix,
+        "max-keys": "1000",
+      };
+      if (continuationToken) {
+        query["continuation-token"] = continuationToken;
+      }
+      const signed = await signedRequest(config, "GET", "", query);
+      let response: Response;
+      try {
+        response = await fetch(signed.url, {
+          method: "GET",
+          headers: signed.headers,
+          redirect: "manual",
+          signal: AbortSignal.timeout(60_000),
+        });
+      } catch {
+        throw new MaterialsServiceError(
+          "TOS 素材目录暂时无法读取，请稍后重试。",
+        );
+      }
+      if (!response.ok) {
+        throw await tosResponseError(response, "TOS 素材目录读取失败");
+      }
+      const pageResult = parseListObjectsResponse(await response.text());
+      for (const object of pageResult.objects) {
+        const asset = await recoveredMaterialAsset(config, object);
+        if (asset) assets.push(asset);
+      }
+      if (!pageResult.isTruncated) break;
+      if (!pageResult.nextContinuationToken) {
+        throw new MaterialsServiceError("TOS 素材目录分页响应不完整。");
+      }
+      continuationToken = pageResult.nextContinuationToken;
+      if (page === 99) {
+        throw new MaterialsServiceError("TOS 素材目录对象数量超过恢复上限。");
+      }
+    }
+  }
+  return assets;
+}
+
+export async function deleteTosMaterialObject(
+  objectKeyValue: string,
+): Promise<void> {
+  const config = tosConfig();
+  const objectKey = requiredString(objectKeyValue, "对象键", 1_024);
+  assertMaterialObjectKey(config, objectKey);
+  const url = await presign(config, "DELETE", objectKey, 600);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "DELETE",
+      redirect: "manual",
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch {
+    throw new MaterialsServiceError("TOS 素材删除请求未能发送，请稍后重试。");
+  }
+  if (response.status >= 300 && response.status < 400) {
+    throw new MaterialsServiceError("TOS 素材删除发生重定向，已阻止继续请求。");
+  }
+  if (!response.ok && response.status !== 404) {
+    throw await tosResponseError(response, "TOS 素材删除失败");
+  }
+}
+
 export function materialLimit(kind: MaterialKind): number {
   return MAX_BYTES[kind];
 }
@@ -292,10 +446,11 @@ async function putObject(
 
 async function presign(
   config: TosConfig,
-  method: "GET" | "PUT",
+  method: "GET" | "HEAD" | "PUT" | "DELETE",
   objectKey: string,
   expires: number,
   signedHeaderValues: Record<string, string> = {},
+  operationQuery: Record<string, string> = {},
 ): Promise<string> {
   const now = new Date();
   const requestDate = amzDate(now);
@@ -314,6 +469,7 @@ async function presign(
   };
   const signedHeaders = Object.keys(headers).sort().join(";");
   const query: Record<string, string> = {
+    ...operationQuery,
     "X-Tos-Algorithm": "TOS4-HMAC-SHA256",
     "X-Tos-Content-Sha256": "UNSIGNED-PAYLOAD",
     "X-Tos-Credential": `${config.accessKey}/${scope}`,
@@ -347,6 +503,59 @@ async function presign(
   query["X-Tos-Signature"] = bytesToHex(await hmac(signingKey, stringToSign));
   url.search = canonicalQueryString(query);
   return url.href;
+}
+
+async function signedRequest(
+  config: TosConfig,
+  method: "GET",
+  objectKey: string,
+  operationQuery: Record<string, string> = {},
+): Promise<{ url: string; headers: Headers }> {
+  const now = new Date();
+  const requestDate = amzDate(now);
+  const shortDate = requestDate.slice(0, 8);
+  const scope = `${shortDate}/${config.region}/tos/request`;
+  const url = new URL(config.endpoint.href);
+  url.pathname = canonicalUri(objectKey);
+  url.search = canonicalQueryString(operationQuery);
+  const payloadHash = await sha256Hex("");
+  const signedHeaderValues: Record<string, string> = {
+    host: url.host,
+    "x-tos-content-sha256": payloadHash,
+    "x-tos-date": requestDate,
+  };
+  const signedHeaders = Object.keys(signedHeaderValues).sort().join(";");
+  const canonicalHeaders = Object.keys(signedHeaderValues)
+    .sort()
+    .map((key) => `${key}:${signedHeaderValues[key]}\n`)
+    .join("");
+  const canonicalRequest = [
+    method,
+    url.pathname,
+    canonicalQueryString(operationQuery),
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+  const stringToSign = [
+    "TOS4-HMAC-SHA256",
+    requestDate,
+    scope,
+    await sha256Hex(canonicalRequest),
+  ].join("\n");
+  const dateKey = await hmac(config.secretKey, shortDate);
+  const regionKey = await hmac(dateKey, config.region);
+  const serviceKey = await hmac(regionKey, "tos");
+  const signingKey = await hmac(serviceKey, "request");
+  const signature = bytesToHex(await hmac(signingKey, stringToSign));
+  return {
+    url: url.href,
+    headers: new Headers({
+      authorization: `TOS4-HMAC-SHA256 Credential=${config.accessKey}/${scope},SignedHeaders=${signedHeaders},Signature=${signature}`,
+      "x-tos-content-sha256": payloadHash,
+      "x-tos-date": requestDate,
+    }),
+  };
 }
 
 function tosConfig(): TosConfig {
@@ -393,6 +602,187 @@ function tosConfig(): TosConfig {
 
 function materialAsset(input: Omit<MaterialAsset, "createdAt">): MaterialAsset {
   return { ...input, createdAt: new Date().toISOString() };
+}
+
+async function recoveredMaterialAsset(
+  config: TosConfig,
+  object: ListedTosObject,
+): Promise<MaterialAsset | null> {
+  let kind: MaterialKind | undefined;
+  for (const candidate of ["video", "image", "audio"] as const) {
+    if (object.key.startsWith(`${config.prefix}${candidate}/`)) {
+      kind = candidate;
+      break;
+    }
+  }
+  if (!kind || object.key.endsWith("/")) return null;
+  try {
+    assertMaterialObjectKey(config, object.key);
+  } catch {
+    return null;
+  }
+  const filename = object.key.split("/").at(-1) ?? "";
+  const extension = filename.split(".").at(-1)?.toLowerCase() ?? "";
+  const contentType = contentTypeForExtension(kind, extension);
+  if (!contentType) return null;
+  const generated = object.key.includes(`/${kind}/generated/`);
+  const manualMatch = /^([0-9a-f]{8}-[0-9a-f-]{27})-(.+)$/i.exec(filename);
+  const generatedDigest = /^([a-f0-9]{64})\.[a-z0-9]+$/i.exec(filename)?.[1];
+  const id = generatedDigest
+    ? `generated-${generatedDigest.slice(0, 24)}`
+    : manualMatch
+      ? `manual-${manualMatch[1]}`
+      : `recovered-${(await sha256Hex(object.key)).slice(0, 24)}`;
+  const createdAt = validIsoDate(object.lastModified);
+  const source = generated
+    ? kind === "video"
+      ? "seedance"
+      : kind === "image"
+        ? "seedream"
+        : "manual"
+    : "manual";
+  return {
+    id,
+    kind,
+    objectKey: object.key,
+    name:
+      manualMatch?.[2] ??
+      `${source === "seedance" ? "Seedance" : source === "seedream" ? "Seedream" : "TOS"} ${kindLabel(kind)}素材 · ${createdAt.slice(0, 10)}.${extension}`,
+    contentType,
+    size: object.size,
+    createdAt,
+    source,
+    sourceRef: `recovered:${object.key}`,
+  };
+}
+
+function parseListObjectsResponse(value: string): {
+  objects: ListedTosObject[];
+  isTruncated: boolean;
+  nextContinuationToken: string;
+} {
+  if (value.trimStart().startsWith("{")) {
+    return parseListObjectsJson(value);
+  }
+  const objects = [...value.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)].map(
+    (match) => ({
+      key: xmlValue(match[1], "Key"),
+      lastModified: xmlValue(match[1], "LastModified"),
+      size: Number(xmlValue(match[1], "Size")),
+    }),
+  );
+  if (
+    objects.some(
+      (object) =>
+        !object.key || !Number.isSafeInteger(object.size) || object.size < 0,
+    )
+  ) {
+    throw new MaterialsServiceError("TOS 素材目录响应格式不正确。");
+  }
+  return {
+    objects,
+    isTruncated: xmlValue(value, "IsTruncated") === "true",
+    nextContinuationToken: xmlValue(value, "NextContinuationToken"),
+  };
+}
+
+function parseListObjectsJson(value: string): {
+  objects: ListedTosObject[];
+  isTruncated: boolean;
+  nextContinuationToken: string;
+} {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new MaterialsServiceError("TOS 素材目录响应格式不正确。");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new MaterialsServiceError("TOS 素材目录响应格式不正确。");
+  }
+  const root = parsed as Record<string, unknown>;
+  const contents = root.Contents ?? root.contents ?? [];
+  if (!Array.isArray(contents)) {
+    throw new MaterialsServiceError("TOS 素材目录响应格式不正确。");
+  }
+  const objects = contents.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new MaterialsServiceError("TOS 素材目录响应格式不正确。");
+    }
+    const object = item as Record<string, unknown>;
+    const key = object.Key ?? object.key;
+    const lastModified = object.LastModified ?? object.lastModified;
+    const size = object.Size ?? object.size;
+    if (
+      typeof key !== "string" ||
+      typeof lastModified !== "string" ||
+      !Number.isSafeInteger(size) ||
+      Number(size) < 0
+    ) {
+      throw new MaterialsServiceError("TOS 素材目录响应格式不正确。");
+    }
+    return { key, lastModified, size: Number(size) };
+  });
+  const isTruncated = root.IsTruncated ?? root.isTruncated;
+  const nextToken =
+    root.NextContinuationToken ?? root.nextContinuationToken ?? "";
+  return {
+    objects,
+    isTruncated: isTruncated === true || isTruncated === "true",
+    nextContinuationToken:
+      typeof nextToken === "string" ? nextToken : "",
+  };
+}
+
+function xmlValue(value: string, tag: string): string {
+  const match = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`).exec(value);
+  return match ? decodeXml(match[1].trim()) : "";
+}
+
+function decodeXml(value: string): string {
+  return value
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .replaceAll("&amp;", "&");
+}
+
+function contentTypeForExtension(
+  kind: MaterialKind,
+  extension: string,
+): string | undefined {
+  return Object.entries(MIME_EXTENSIONS[kind]).find(
+    ([, candidate]) => candidate === extension,
+  )?.[0];
+}
+
+function validIsoDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
+async function tosResponseError(
+  response: Response,
+  label: string,
+): Promise<MaterialsServiceError> {
+  const requestId = response.headers.get("x-tos-request-id");
+  let errorCode = "";
+  try {
+    const body = await response.text();
+    if (body.trimStart().startsWith("{")) {
+      const parsed = JSON.parse(body) as { Code?: unknown; code?: unknown };
+      const code = parsed.Code ?? parsed.code;
+      errorCode = typeof code === "string" ? code : "";
+    } else {
+      errorCode = xmlValue(body, "Code");
+    }
+  } catch {
+    // The status and request ID are still enough to correlate the TOS failure.
+  }
+  return new MaterialsServiceError(
+    `${label}（HTTP ${response.status}${errorCode ? `，${errorCode}` : ""}${requestId ? `，Request ID ${requestId}` : ""}）。`,
+  );
 }
 
 function materialKind(value: string | null): MaterialKind {
@@ -619,6 +1009,13 @@ function assertObjectKey(config: TosConfig, objectKey: string) {
     /[\r\n\0]/.test(objectKey)
   ) {
     throw new MaterialsValidationError("对象键不在允许的 demo/ 路径内。");
+  }
+}
+
+function assertMaterialObjectKey(config: TosConfig, objectKey: string) {
+  assertObjectKey(config, objectKey);
+  if (!/^demo\/(?:video|image|audio)\/(?:generated|uploads)\//.test(objectKey)) {
+    throw new MaterialsValidationError("对象键不属于可管理的素材路径。");
   }
 }
 

@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  deleteMaterialAsset,
+  loadMaterialAssets,
   MATERIAL_LIBRARY_EVENT,
   MATERIAL_LIBRARY_OPEN_EVENT,
-  materialPreviewUrl,
+  materialTosUrl,
   readMaterialAssets,
+  renameMaterialAsset,
   type MaterialAsset,
   type MaterialKind,
   uploadManualMaterial,
@@ -180,10 +183,10 @@ export function TemplateAssetLibrary() {
             <button type="button" onClick={() => showMaterials("video")}>
               <span>05</span>
               <strong>视频 / 图片 / 音频</strong>
-              <em>LOCAL INDEX</em>
+              <em>PERSISTENT INDEX</em>
             </button>
           </div>
-          <p>模板来自仓库；TOS 素材索引只保存在当前浏览器。</p>
+          <p>模板来自仓库；TOS 素材由持久索引跨浏览器恢复。</p>
         </aside>
       </section>
 
@@ -378,17 +381,34 @@ function MaterialCatalog({
   const [assets, setAssets] = useState<MaterialAsset[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [catalogWarning, setCatalogWarning] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const activeConfig = MATERIAL_KINDS.find((item) => item.id === activeKind)!;
   const visibleAssets = assets.filter((asset) => asset.kind === activeKind);
 
   useEffect(() => {
-    function refresh() {
+    let active = true;
+    function refreshCache() {
       setAssets(readMaterialAssets());
     }
-    refresh();
-    window.addEventListener(MATERIAL_LIBRARY_EVENT, refresh);
-    return () => window.removeEventListener(MATERIAL_LIBRARY_EVENT, refresh);
+    refreshCache();
+    void loadMaterialAssets()
+      .then(({ assets: next, warning }) => {
+        if (!active) return;
+        setAssets(next);
+        setCatalogWarning(warning ?? "");
+      })
+      .catch((error) => {
+        if (!active) return;
+        setUploadError(
+          error instanceof Error ? error.message : "读取素材库失败。",
+        );
+      });
+    window.addEventListener(MATERIAL_LIBRARY_EVENT, refreshCache);
+    return () => {
+      active = false;
+      window.removeEventListener(MATERIAL_LIBRARY_EVENT, refreshCache);
+    };
   }, []);
 
   async function upload(file: File | undefined) {
@@ -414,7 +434,7 @@ function MaterialCatalog({
           <h2>素材库</h2>
         </div>
         <p>
-          文件保存在私有 TOS；页面索引仅属于当前浏览器，不会跨设备同步。
+          文件保存在私有 TOS；持久索引会跨浏览器恢复，预览时自动刷新临时签名。
         </p>
       </div>
 
@@ -460,6 +480,11 @@ function MaterialCatalog({
         </button>
       </div>
       {uploadError && <p className="material-error">{uploadError}</p>}
+      {catalogWarning && (
+        <p className="material-warning" role="status">
+          {catalogWarning}
+        </p>
+      )}
 
       {visibleAssets.length ? (
         <div className="material-card-grid">
@@ -480,57 +505,259 @@ function MaterialCatalog({
 }
 
 function MaterialCard({ asset }: { asset: MaterialAsset }) {
-  const preview = materialPreviewUrl(asset.objectKey);
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(asset.name);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewError, setPreviewError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const previewRetried = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    void materialTosUrl(asset.objectKey)
+      .then((url) => {
+        if (active) setPreviewUrl(url);
+      })
+      .catch((error) => {
+        if (active) {
+          setPreviewError(
+            error instanceof Error ? error.message : "预览地址获取失败。",
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [asset.objectKey]);
+
+  async function refreshPreviewAfterError() {
+    if (previewRetried.current) {
+      setPreviewError("素材暂时无法预览，请稍后重试。");
+      return;
+    }
+    previewRetried.current = true;
+    try {
+      setPreviewError("");
+      setPreviewUrl(await materialTosUrl(asset.objectKey));
+    } catch (error) {
+      setPreviewError(
+        error instanceof Error ? error.message : "预览地址刷新失败。",
+      );
+    }
+  }
+
+  async function saveName() {
+    if (savingName) return;
+    setSavingName(true);
+    setActionError("");
+    try {
+      await renameMaterialAsset(asset.id, draftName);
+      setEditing(false);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "修改素材名称失败。",
+      );
+    } finally {
+      setSavingName(false);
+    }
+  }
+
+  async function copyUrl() {
+    try {
+      const url = await materialTosUrl(asset.objectKey);
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setActionError("");
+      window.setTimeout(() => setCopied(false), 1_600);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "复制 URL 失败。",
+      );
+    }
+  }
+
+  async function removeAsset() {
+    if (deleting) return;
+    setDeleting(true);
+    setActionError("");
+    try {
+      await deleteMaterialAsset(asset.id);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "删除素材失败。",
+      );
+      setConfirmingDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
-    <article className="material-card">
+    <article className={`material-card material-card-${asset.kind}`}>
       <div className="material-preview">
         {asset.kind === "image" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img alt={asset.name} loading="lazy" src={preview} />
+          previewUrl ? (
+            <a
+              aria-label={`打开 ${asset.name}`}
+              className="material-preview-link"
+              href={previewUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt={asset.name}
+                loading="lazy"
+                onError={() => void refreshPreviewAfterError()}
+                onLoad={() => {
+                  previewRetried.current = false;
+                  setPreviewError("");
+                }}
+                src={previewUrl}
+              />
+            </a>
+          ) : (
+            <span className="material-preview-status">正在获取预览…</span>
+          )
         ) : asset.kind === "video" ? (
-          <video controls playsInline preload="metadata" src={preview} />
+          previewUrl ? (
+            <video
+              controls
+              onError={() => void refreshPreviewAfterError()}
+              onLoadedMetadata={() => {
+                previewRetried.current = false;
+                setPreviewError("");
+              }}
+              playsInline
+              preload="metadata"
+              src={previewUrl}
+            />
+          ) : (
+            <span className="material-preview-status">正在获取预览…</span>
+          )
         ) : (
           <div className="material-audio-preview">
             <span aria-hidden="true">♫</span>
-            <audio controls preload="metadata" src={preview} />
+            {previewUrl ? (
+              <audio
+                controls
+                onError={() => void refreshPreviewAfterError()}
+                onLoadedMetadata={() => {
+                  previewRetried.current = false;
+                  setPreviewError("");
+                }}
+                preload="metadata"
+                src={previewUrl}
+              />
+            ) : (
+              <small>正在获取预览…</small>
+            )}
           </div>
+        )}
+        {previewError && (
+          <span className="material-preview-error" role="alert">
+            {previewError}
+          </span>
         )}
       </div>
       <div className="material-card-body">
-        <div>
-          <span>{sourceLabel(asset.source)}</span>
-          <small>{formatBytes(asset.size)}</small>
-        </div>
-        <h3>{asset.name}</h3>
-        <p>{formatDate(asset.createdAt)}</p>
-        <a href={preview} target="_blank" rel="noreferrer">
-          打开原文件 ↗
-        </a>
+        {editing ? (
+          <form
+            className="material-name-editor"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveName();
+            }}
+          >
+            <input
+              aria-label="素材名称"
+              autoFocus
+              maxLength={180}
+              onChange={(event) => {
+                setDraftName(event.target.value);
+                setActionError("");
+              }}
+              value={draftName}
+            />
+            <button disabled={!draftName.trim() || savingName} type="submit">
+              {savingName ? "保存中…" : "保存"}
+            </button>
+            <button
+              onClick={() => {
+                setDraftName(asset.name);
+                setEditing(false);
+                setActionError("");
+              }}
+              type="button"
+            >
+              取消
+            </button>
+          </form>
+        ) : (
+          <div className="material-name-row">
+            <h3 title={asset.name}>{asset.name}</h3>
+          </div>
+        )}
+        {!editing && !confirmingDelete && (
+          <div className="material-card-actions">
+            <button
+              aria-label={`修改 ${asset.name} 的名称`}
+              onClick={() => {
+                setEditing(true);
+                setActionError("");
+              }}
+              type="button"
+            >
+              修改名称
+            </button>
+            <button onClick={() => void copyUrl()} type="button">
+              {copied ? "已复制" : "复制 URL"}
+            </button>
+            <button
+              className="material-delete-trigger"
+              onClick={() => {
+                setConfirmingDelete(true);
+                setActionError("");
+              }}
+              type="button"
+            >
+              删除
+            </button>
+          </div>
+        )}
+        {confirmingDelete && (
+          <div className="material-delete-confirm" role="alertdialog">
+            <strong>同步删除“{asset.name}”？</strong>
+            <span>素材库与 TOS 对象会同时删除，且无法撤销。</span>
+            <div>
+              <button
+                className="material-delete-danger"
+                disabled={deleting}
+                onClick={() => void removeAsset()}
+                type="button"
+              >
+                {deleting ? "删除中…" : "确认删除"}
+              </button>
+              <button
+                disabled={deleting}
+                onClick={() => setConfirmingDelete(false)}
+                type="button"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        )}
+        {actionError && (
+          <span className="material-action-error" role="alert">
+            {actionError}
+          </span>
+        )}
       </div>
     </article>
   );
-}
-
-function sourceLabel(source: MaterialAsset["source"]): string {
-  return {
-    seedance: "Seedance 生成",
-    seedream: "Seedream 生成",
-    manual: "手动上传",
-  }[source];
-}
-
-function formatBytes(value: number): string {
-  if (!value) return "大小未知";
-  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat("zh-CN", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(date);
 }

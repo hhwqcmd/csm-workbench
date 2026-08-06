@@ -3864,37 +3864,89 @@ footer p {
   padding: 12px 14px;
 }
 
+.material-warning {
+  background: rgba(211, 255, 55, 0.08);
+  border: 1px solid rgba(211, 255, 55, 0.26);
+  border-radius: 12px;
+  color: #dce8c9;
+  margin: -16px 0 30px;
+  padding: 12px 14px;
+}
+
 .material-card-grid {
   display: grid;
-  gap: 20px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 }
 
 .material-card {
-  background: #f8faf5;
+  aspect-ratio: 4 / 3;
+  background: #202620;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 20px;
-  color: var(--ink);
+  border-radius: 12px;
+  color: #fff;
   min-width: 0;
   overflow: hidden;
+  position: relative;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.material-card:hover {
+  border-color: rgba(216, 255, 69, 0.48);
+  transform: translateY(-2px);
 }
 
 .material-preview {
   align-items: center;
-  aspect-ratio: 16 / 10;
   background:
     linear-gradient(135deg, rgba(63, 93, 224, 0.14), rgba(216, 255, 69, 0.12)),
     #e6eadf;
   display: flex;
+  inset: 0;
   justify-content: center;
   overflow: hidden;
+  position: absolute;
+}
+
+.material-preview-link {
+  display: block;
+  height: 100%;
+  position: relative;
+  text-decoration: none;
+  width: 100%;
 }
 
 .material-preview img,
 .material-preview video {
   height: 100%;
-  object-fit: cover;
   width: 100%;
+}
+
+.material-preview img {
+  object-fit: cover;
+}
+
+.material-preview video {
+  object-fit: cover;
+}
+
+.material-preview-status,
+.material-preview-error {
+  background: rgba(20, 27, 22, 0.78);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11px;
+  padding: 8px 11px;
+}
+
+.material-preview-error {
+  bottom: 48px;
+  left: 10px;
+  max-width: calc(100% - 20px);
+  position: absolute;
+  text-align: center;
 }
 
 .material-audio-preview {
@@ -3918,41 +3970,188 @@ footer p {
 }
 
 .material-card-body {
-  padding: 20px;
+  background: linear-gradient(
+    to top,
+    rgba(10, 13, 10, 0.8),
+    rgba(10, 13, 10, 0) 48%
+  );
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
 }
 
-.material-card-body > div {
+.material-name-row {
+  bottom: 0;
+  left: 0;
+  padding: 42px 12px 12px;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
+.material-name-row h3 {
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.3;
+  margin: 0;
+  overflow: hidden;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.66);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-name-editor button,
+.material-card-actions button,
+.material-delete-confirm button {
+  background: rgba(10, 13, 10, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 750;
+  padding: 7px 9px;
+  white-space: nowrap;
+}
+
+.material-name-editor {
+  background: rgba(10, 13, 10, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  bottom: 10px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  left: 10px;
+  padding: 7px;
+  pointer-events: auto;
+  position: absolute;
+  right: 10px;
+}
+
+.material-name-editor input {
+  background: #fff;
+  border: 1px solid #b8beb4;
+  border-radius: 7px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  min-width: 0;
+  padding: 7px 8px;
+}
+
+.material-name-editor input:focus {
+  border-color: var(--blue);
+  outline: 2px solid rgba(58, 91, 228, 0.16);
+}
+
+.material-name-editor button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.material-card-actions {
   align-items: center;
   display: flex;
+  gap: 6px;
   justify-content: space-between;
+  opacity: 0;
+  pointer-events: auto;
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  transform: translateY(-3px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
 }
 
-.material-card-body > div span,
-.material-card-body > div small {
-  color: #697067;
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.material-card:hover .material-card-actions,
+.material-card:focus-within .material-card-actions {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-.material-card-body h3 {
-  font-size: 17px;
-  line-height: 1.4;
-  margin: 15px 0 6px;
+.material-card-actions span {
+  background: rgba(148, 22, 22, 0.88);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 10px;
+  padding: 7px 9px;
+}
+
+.material-card-actions .material-delete-trigger {
+  border-color: rgba(255, 144, 144, 0.48);
+  color: #ffd0d0;
+}
+
+.material-delete-confirm {
+  background: rgba(24, 14, 14, 0.96);
+  border: 1px solid rgba(255, 139, 139, 0.5);
+  border-radius: 10px;
+  display: grid;
+  gap: 6px;
+  left: 10px;
+  padding: 10px;
+  pointer-events: auto;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+
+.material-delete-confirm strong {
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
-.material-card-body p {
-  color: #757d73;
-  font-size: 11px;
-  margin: 0 0 18px;
+.material-delete-confirm > span {
+  color: #ffd1d1;
+  font-size: 10px;
+  line-height: 1.45;
 }
 
-.material-card-body a {
-  color: var(--blue);
-  font-size: 12px;
-  font-weight: 750;
+.material-delete-confirm > div {
+  display: flex;
+  gap: 6px;
+}
+
+.material-delete-confirm .material-delete-danger {
+  background: #a52828;
+  border-color: #d95b5b;
+}
+
+.material-delete-confirm button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.material-action-error {
+  background: rgba(148, 22, 22, 0.92);
+  border-radius: 8px;
+  bottom: 42px;
+  color: #fff;
+  font-size: 10px;
+  left: 10px;
+  max-width: calc(100% - 20px);
+  padding: 7px 9px;
+  pointer-events: auto;
+  position: absolute;
+}
+
+.material-card-video .material-name-row {
+  bottom: 32px;
+}
+
+.material-card-video .material-name-editor {
+  bottom: 42px;
+}
+
+@media (hover: none) {
+  .material-card-actions {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .material-empty {
@@ -4445,7 +4644,7 @@ textarea:focus-visible {
   }
 
   .material-card-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   }
 
   .asset-category-intro > span {
@@ -4665,7 +4864,7 @@ textarea:focus-visible {
   }
 
   .material-card-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   }
 
   .asset-category-intro,
