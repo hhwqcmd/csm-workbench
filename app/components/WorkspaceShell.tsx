@@ -198,9 +198,6 @@ export function WorkspaceShell() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  const activeView =
-    WORKSPACE_VIEWS.find((item) => item.id === view) ?? WORKSPACE_VIEWS[0];
-
   return (
     <main>
       <header className="topbar">
@@ -235,21 +232,6 @@ export function WorkspaceShell() {
         </nav>
 
         <div className="topbar-actions">
-          <span className="module-position" aria-label={`当前栏目 ${activeView.index} / 07`}>
-            {activeView.index}
-            <small>/ 07</small>
-          </span>
-          <span className="local-badge">本地演示模式</span>
-          {view === "seedance" && (
-            <>
-              <a className="topbar-anchor" href="#sample">
-                官方示例
-              </a>
-              <a className="topbar-anchor" href="#operations">
-                实操控制台
-              </a>
-            </>
-          )}
           <a
             className="doc-link"
             href={

@@ -213,7 +213,10 @@ test("keeps the seven-studio shell compact and anchor-safe across breakpoints", 
 
   assert.match(source, /const WORKSPACE_VIEWS/);
   assert.match(source, /data-short-label=\{item\.shortLabel\}/);
-  assert.match(source, /className="module-position"/);
+  assert.match(source, /className="doc-link"/);
+  assert.doesNotMatch(source, /className="module-position"/);
+  assert.doesNotMatch(source, /className="local-badge"/);
+  assert.doesNotMatch(source, /className="topbar-anchor"/);
   assert.match(source, /getElementById\(targetId\)/);
   assert.match(source, /window\.requestAnimationFrame/);
   assert.match(source, /scrollIntoView\(\{ behavior: "auto", block: "start" \}\)/);
