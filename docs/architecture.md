@@ -14,6 +14,7 @@ run_demo.sh
 演示产品路径
 浏览器
   → SeedanceTaskRunner
+  → 单任务或浏览器本地受控批次（2–12 项，并发 3）
   → POST /api/seedance/tasks 或 /api/seedance/tasks/status
   → app/lib/seedance-server.ts
   → 标准 API 或 Agent Plan 白名单 Base URL
@@ -93,12 +94,12 @@ AI coding 路径
 1. 接收浏览器本次手工输入的 Key，但不在服务端持久化、记录或回显。
 2. Seedance 将 API 路径限制为标准 API 与 Agent Plan 两个精确 Base URL；Seedream、Responses API 与 Managed Agents 只允许标准 `/api/v3`。
 3. 校验模型属于对应路径；Agent Plan 使用套餐别名，标准 API 使用日期版本 Model ID。
-4. 校验通用 `content` 多模态数组、素材 URL、时长、比例、4K 模型限制与联网搜索纯文本限制。
+4. 校验通用 `content` 多模态数组、素材 URL、时长、比例、4K 模型限制与联网搜索纯文本限制；标准 API 的 Seedance 2.5 额外校验并转发 `omni_reference_task_type`。
 5. 创建任务并只向浏览器返回必要的任务 ID。
 6. 查询并归一化任务状态。
 7. 对错误进行安全脱敏，避免返回 Secret 或内部日志。
 8. Managed Agents 校验 Agent 创建/版本化更新的完整字段、Skills/Tools/MCP/Multi Agent 约束，以及云环境、Session、事件、文件资源与 Memory Store/Memory 结构；事件流必须先建立上游 SSE，再发送用户事件。
-9. Seedream 校验 Pro/Lite 模型能力、图片公网地址、输入数量、尺寸、组图、联网、流式与图片 API Prompt 优化参数；真实生成先创建可恢复任务并把匿名令牌写入浏览器，再由独立 `run` 请求执行长调用，D1 只保存 24 小时状态、URL 结果和脱敏错误，API Key、Prompt、参考图与完整请求只存在于执行请求内存；Prompt 一键优化只使用服务端内置场景技巧调用 `doubao-seed-evolving`。
+9. Seedream 校验 Pro/Lite 模型能力、图片公网地址、输入数量、尺寸、组图、联网、流式、图片 API Prompt 优化参数和 Prompt 内 point/bbox 标签；坐标不进入独立上游字段。真实生成先创建可恢复任务并把匿名令牌写入浏览器，再由独立 `run` 请求执行长调用，D1 只保存 24 小时状态、URL 结果和脱敏错误，API Key、Prompt、参考图与完整请求只存在于执行请求内存；Prompt 一键优化只使用服务端内置场景技巧调用 `doubao-seed-evolving`。
 10. Responses API 校验完整顶层字段、InputItem 素材 URL、工具必填项、缓存互斥和生命周期 ID；同步 JSON 与 SSE 均在返回浏览器前执行凭证脱敏。
 11. 素材接口固定 TOS bucket、Endpoint、Region 与 `demo/` 前缀，校验 MIME、大小、对象键和公网 HTTPS 重定向；图片在校验后以不超过 20 MB 的固定长度二进制请求体上传，视频和音频保持限流流式上传；TOS AK/SK 只用于服务端签名，不进入浏览器或错误响应。
 

@@ -3,7 +3,11 @@ import {
   isAllowedModel,
   isApiPath,
   RATIOS,
+  validateSeedanceConstraints,
   type ApiPath,
+  type SeedanceOmniReferenceTaskType,
+  type SeedanceOutputFormat,
+  type SeedanceResolution,
 } from "./seedance-config";
 import type {
   SeedanceContentItem,
@@ -27,12 +31,25 @@ export type GetTaskInput = Connection & {
 
 export class RequestValidationError extends Error {}
 
+export class SeedanceUpstreamError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 export function parseCreateTaskInput(value: unknown): CreateTaskInput {
   const body = asRecord(value);
   const connection = parseConnection(body);
   return {
     ...connection,
-    requestBody: parseRequestBody(body.requestBody, connection.model),
+    requestBody: parseRequestBody(
+      body.requestBody,
+      connection.apiPath,
+      connection.model,
+    ),
   };
 }
 
@@ -93,18 +110,36 @@ export async function getSeedanceTask(input: GetTaskInput) {
   const status = stringAt(payload, "status") ?? "running";
   const content = asOptionalRecord(payload.content);
   const error = asOptionalRecord(payload.error);
+  const usage = asOptionalRecord(payload.usage);
+  const toolUsage = usage ? asOptionalRecord(usage.tool_usage) : undefined;
+  const terminalError =
+    status === "failed" || status === "cancelled" || status === "expired";
 
   return {
     id: stringAt(payload, "id") ?? input.taskId,
     status,
     videoUrl: content ? stringAt(content, "video_url") : undefined,
     lastFrameUrl: content ? stringAt(content, "last_frame_url") : undefined,
+    duration: numberAt(payload, "duration"),
+    ratio: stringAt(payload, "ratio"),
+    resolution: stringAt(payload, "resolution"),
+    outputFormat: stringAt(payload, "output_format"),
+    usage: usage
+      ? {
+          completionTokens: numberAt(usage, "completion_tokens"),
+          totalTokens: numberAt(usage, "total_tokens"),
+          webSearch: toolUsage ? numberAt(toolUsage, "web_search") : undefined,
+        }
+      : undefined,
     error:
-      status === "failed"
+      terminalError
         ? safeError(
-            (error && stringAt(error, "message")) ??
-              (error && stringAt(error, "code")) ??
-              "任务执行失败。",
+            [
+              error && stringAt(error, "code"),
+              error && stringAt(error, "message"),
+            ]
+              .filter(Boolean)
+              .join(" · ") || terminalStatusMessage(status),
             input.apiKey,
           )
         : undefined,
@@ -139,6 +174,7 @@ function parseConnection(body: Record<string, unknown>): Connection {
 
 function parseRequestBody(
   value: unknown,
+  apiPath: ApiPath,
   selectedModel: string,
 ): SeedanceRequestBody {
   const body = asRecord(value);
@@ -149,6 +185,8 @@ function parseRequestBody(
     "resolution",
     "ratio",
     "duration",
+    "output_format",
+    "omni_reference_task_type",
     "watermark",
     "return_last_frame",
     "tools",
@@ -169,51 +207,11 @@ function parseRequestBody(
   }
 
   const content = body.content.map(parseContentItem);
-  if (content.filter((item) => item.type === "text").length !== 1) {
-    throw new RequestValidationError("content 必须且只能包含一项 text。");
-  }
-  const counts = {
-    image_url: content.filter((item) => item.type === "image_url").length,
-    video_url: content.filter((item) => item.type === "video_url").length,
-    audio_url: content.filter((item) => item.type === "audio_url").length,
-  };
-  if (counts.image_url > 9 || counts.video_url > 3 || counts.audio_url > 3) {
-    throw new RequestValidationError(
-      "参考素材上限为 9 张图片、3 段视频和 3 段音频。",
-    );
-  }
-  const firstFrames = content.filter(
-    (item) => item.type === "image_url" && item.role === "first_frame",
-  ).length;
-  const lastFrames = content.filter(
-    (item) => item.type === "image_url" && item.role === "last_frame",
-  ).length;
-  if (
-    (firstFrames > 0 || lastFrames > 0) &&
-    (firstFrames !== 1 ||
-      lastFrames !== 1 ||
-      counts.image_url !== 2 ||
-      counts.video_url !== 0 ||
-      counts.audio_url !== 0)
-  ) {
-    throw new RequestValidationError(
-      "首尾帧模式必须且只能包含一张 first_frame 和一张 last_frame 图片。",
-    );
-  }
-
   const ratio = requiredString(body.ratio, "ratio", 12);
   if (!RATIOS.includes(ratio as (typeof RATIOS)[number])) {
     throw new RequestValidationError("ratio 不在当前支持范围内。");
   }
   const duration = body.duration;
-  if (
-    typeof duration !== "number" ||
-    !Number.isInteger(duration) ||
-    duration < 4 ||
-    duration > 15
-  ) {
-    throw new RequestValidationError("duration 必须是 4 到 15 的整数。");
-  }
   if (
     body.generate_audio !== undefined &&
     typeof body.generate_audio !== "boolean"
@@ -238,12 +236,25 @@ function parseRequestBody(
       "resolution 只支持 480p、720p、1080p 或 4k。",
     );
   }
+  const outputFormat = body.output_format;
   if (
-    resolution === "4k" &&
-    model !== "doubao-seedance-2-0-260128" &&
-    model !== "doubao-seedance-2.0"
+    outputFormat !== undefined &&
+    outputFormat !== "mp4" &&
+    outputFormat !== "mov"
   ) {
-    throw new RequestValidationError("4K 仅支持 Seedance 2.0 完整模型。");
+    throw new RequestValidationError("output_format 只支持 mp4 或 mov。");
+  }
+  const omniReferenceTaskType = body.omni_reference_task_type;
+  if (
+    omniReferenceTaskType !== undefined &&
+    omniReferenceTaskType !== "auto" &&
+    omniReferenceTaskType !== "reference" &&
+    omniReferenceTaskType !== "edit" &&
+    omniReferenceTaskType !== "extend"
+  ) {
+    throw new RequestValidationError(
+      "omni_reference_task_type 只支持 auto、reference、edit 或 extend。",
+    );
   }
 
   let tools: Array<{ type: "web_search" }> | undefined;
@@ -257,17 +268,29 @@ function parseRequestBody(
         "tools 当前只支持 [{\"type\":\"web_search\"}]。",
       );
     }
-    if (content.some((item) => item.type !== "text")) {
-      throw new RequestValidationError("联网搜索能力仅适用于纯文本输入。");
-    }
     tools = [{ type: "web_search" }];
+  }
+
+  const constraintErrors = validateSeedanceConstraints({
+    apiPath,
+    model,
+    content,
+    ratio,
+    duration,
+    resolution,
+    outputFormat,
+    webSearch: Boolean(tools),
+    omniReferenceTaskType,
+  });
+  if (constraintErrors.length > 0) {
+    throw new RequestValidationError(constraintErrors[0]);
   }
 
   const parsed: SeedanceRequestBody = {
     model,
     content,
     ratio: ratio as SeedanceRequestBody["ratio"],
-    duration,
+    duration: duration as number,
     watermark: body.watermark,
   };
   if (body.generate_audio !== undefined) {
@@ -277,7 +300,14 @@ function parseRequestBody(
     parsed.return_last_frame = body.return_last_frame;
   }
   if (resolution !== undefined) {
-    parsed.resolution = resolution as SeedanceRequestBody["resolution"];
+    parsed.resolution = resolution as SeedanceResolution;
+  }
+  if (outputFormat !== undefined) {
+    parsed.output_format = outputFormat as SeedanceOutputFormat;
+  }
+  if (omniReferenceTaskType !== undefined) {
+    parsed.omni_reference_task_type =
+      omniReferenceTaskType as SeedanceOmniReferenceTaskType;
   }
   if (tools) parsed.tools = tools;
   return parsed;
@@ -433,6 +463,21 @@ function stringAt(
   return typeof value[key] === "string" ? value[key] : undefined;
 }
 
+function numberAt(
+  value: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  return typeof value[key] === "number" && Number.isFinite(value[key])
+    ? value[key]
+    : undefined;
+}
+
+function terminalStatusMessage(status: string): string {
+  if (status === "cancelled") return "任务已取消。";
+  if (status === "expired") return "任务已过期。";
+  return "任务执行失败。";
+}
+
 function upstreamFailure(
   status: number,
   payload: Record<string, unknown>,
@@ -445,13 +490,14 @@ function upstreamFailure(
     (nestedError && stringAt(nestedError, "message")) ??
     stringAt(payload, "message");
   const detail = [code, message].filter(Boolean).join(" · ");
-  return new Error(
+  return new SeedanceUpstreamError(
     safeError(
       detail
         ? `火山方舟请求失败（HTTP ${status}）：${detail}`
         : `火山方舟请求失败（HTTP ${status}）。`,
       apiKey,
     ),
+    status,
   );
 }
 

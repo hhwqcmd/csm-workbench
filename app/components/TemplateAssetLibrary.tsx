@@ -22,6 +22,7 @@ import {
 } from "../lib/template-assets";
 import { navigateWorkspace } from "../lib/workspace-navigation";
 import { APPLY_EXAMPLE_EVENT } from "./SeedanceExampleGallery";
+import type { SeedanceExample } from "../lib/seedance-examples";
 
 type LibrarySection = "templates" | "materials";
 
@@ -58,6 +59,8 @@ export function TemplateAssetLibrary() {
   const [activeMaterialKind, setActiveMaterialKind] =
     useState<MaterialKind>("video");
   const [copiedId, setCopiedId] = useState("");
+  const [applyingId, setApplyingId] = useState("");
+  const [applyError, setApplyError] = useState("");
 
   const counts = useMemo(
     () =>
@@ -102,11 +105,43 @@ export function TemplateAssetLibrary() {
     window.setTimeout(() => setCopiedId(""), 1_600);
   }
 
-  function applyTemplate(asset: TemplateAsset) {
-    if (!asset.runnableExample) return;
+  async function applyTemplate(asset: TemplateAsset) {
+    if (!asset.runnableExample || applyingId) return;
+    setApplyError("");
+    let example: SeedanceExample = asset.runnableExample;
+    if (asset.materialSlots?.length) {
+      setApplyingId(asset.id);
+      try {
+        const resolved = await Promise.all(
+          asset.materialSlots.map(async (slot) => ({
+            slot,
+            url: await materialTosUrl(slot.objectKey),
+          })),
+        );
+        const requestBody = structuredClone(example.requestBody);
+        for (const { slot, url } of resolved) {
+          const item = requestBody.content[slot.contentIndex];
+          if (slot.kind === "image" && item?.type === "image_url") {
+            item.image_url.url = url;
+          } else if (slot.kind === "video" && item?.type === "video_url") {
+            item.video_url.url = url;
+          } else {
+            throw new Error(`模板素材槽位 ${slot.contentIndex} 与内容不匹配。`);
+          }
+        }
+        example = { ...example, requestBody };
+      } catch (error) {
+        setApplyError(
+          error instanceof Error ? error.message : "获取模板素材链接失败。",
+        );
+        return;
+      } finally {
+        setApplyingId("");
+      }
+    }
     window.dispatchEvent(
       new CustomEvent(APPLY_EXAMPLE_EVENT, {
-        detail: asset.runnableExample,
+        detail: example,
       }),
     );
     navigateWorkspace("seedance");
@@ -223,9 +258,11 @@ export function TemplateAssetLibrary() {
         {section === "templates" ? (
           <TemplateCatalog
             activeCategory={activeCategory}
+            applyError={applyError}
+            applyingId={applyingId}
             copiedId={copiedId}
             counts={counts}
-            onApply={applyTemplate}
+            onApply={(asset) => void applyTemplate(asset)}
             onCopy={copyPrompt}
             onSelect={setActiveCategory}
           />
@@ -242,6 +279,8 @@ export function TemplateAssetLibrary() {
 
 function TemplateCatalog({
   activeCategory,
+  applyError,
+  applyingId,
   copiedId,
   counts,
   onApply,
@@ -249,6 +288,8 @@ function TemplateCatalog({
   onSelect,
 }: {
   activeCategory: TemplateCategoryId;
+  applyError: string;
+  applyingId: string;
   copiedId: string;
   counts: Record<TemplateCategoryId, number>;
   onApply: (asset: TemplateAsset) => void;
@@ -354,13 +395,22 @@ function TemplateCatalog({
                       <button
                         className="asset-apply-button"
                         data-testid={`apply-template-${asset.id}`}
+                        disabled={Boolean(applyingId)}
                         onClick={() => onApply(asset)}
                         type="button"
                       >
-                        填入实操台 <span aria-hidden="true">→</span>
+                        {applyingId === asset.id
+                          ? "正在取素材…"
+                          : "填入实操台"}{" "}
+                        <span aria-hidden="true">→</span>
                       </button>
                     )}
                   </div>
+                  {applyError && applyingId === "" && (
+                    <p className="asset-apply-error" role="alert">
+                      {applyError}
+                    </p>
+                  )}
                 </article>
               ))}
             </div>

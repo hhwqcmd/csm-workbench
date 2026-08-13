@@ -14,7 +14,7 @@
 
 官方 Python 快速示例作为协议和素材基线独立保留，不是产品页面主线。页面不得重新加入共学进度、环境安装步骤或教程路线。
 
-当前事实（最后核对：2026-08-06）：
+当前事实（最后核对：2026-08-13）：
 
 - 默认连接为标准官方 API + `doubao-seedance-2-0-mini-260615`，同时支持 Agent Plan 套餐通道。
 - 项目处于测试阶段，只在本地开发、调试和运行。`.openai/hosting.json` 保留既有 Sites `project_id` 作为历史关联，但短期内不得保存或部署新版本；既有站点已收紧为仅项目所有者可访问。
@@ -27,8 +27,10 @@
 
 - `app/page.tsx` → `app/components/WorkspaceShell.tsx`：页面入口、顶级栏目和整体组合。
 - `app/components/SeedanceTaskRunner.tsx`：连接、参数、完整 API 编辑、费用确认、创建、轮询、历史和日志。
+- `app/lib/seedance-batch.ts`、`app/lib/seedance-pricing.ts`：受控批次类型/并发/本机持久化契约与带复核日期的条件化人民币估算；批次不保存 Key、不新增上游协议。
 - `app/components/SeedreamWorkbench.tsx`：十类 Seedream 示例的表单/JSON 双向编辑、Prompt 技巧与 Seed-Evolving 优化、可恢复后台生成、费用确认、历史和日志。
 - `app/lib/seedream-examples.ts`、`app/lib/seedream-server.ts`、`app/lib/seedream-jobs-server.ts`：Seedream 示例、模型能力适配、严格字段/素材/尺寸校验、同源上游代理与 24 小时短期任务状态。
+- `app/lib/seedream-annotations.ts`：Prompt 原生 point/bbox 标签解析、0–999 坐标归一化、具体 occurrence 删除和前后端共享校验。
 - `app/api/seedream/`：图片后台任务、兼容生成入口和 Prompt 优化同源路由。
 - `app/components/ResponsesWorkbench.tsx`：Responses API 八类场景、表单/JSON 联动、生命周期操作、SSE、响应、完整协议目录、历史与日志。
 - `app/lib/responses-examples.ts`、`app/lib/responses-server.ts`、`app/api/responses/route.ts`：示例与字段目录、标准 Base URL 白名单、请求校验、同步/流式代理和生命周期入口。
@@ -96,12 +98,15 @@
 - 历史最多保留 30 条；提交开始即建档，创建失败也保留，创建与查询日志中的 Authorization 必须掩码。
 - 轮询继续使用 POST 请求体，禁止把 Key 放入 GET URL；连续 `running` 依靠 `pollCycle` 重调度。
 - 页面加载、模板预填、构建、测试和健康检查绝不能创建真实任务。真实创建必须通过费用确认和显式执行。
+- Seedance 2.5 的 `omni_reference_task_type` 仅标准 API 全模态参考任务可用；显式类型必须与 Prompt 推断一致，edit/extend 的参考视频、adaptive 和 `duration=-1` 约束不得只放在前端。
+- Seedance 批量实验总任务数只能是 2–12，创建/查询并发都不得超过 3，必须执行两级费用确认。只允许手动重试明确未创建项；创建结果未知和已有 task ID 的终态不得重试。批次最多保留 10 个本机记录且不得保存 API Key。
 - 普通素材仅允许公网 HTTPS；预置虚拟人像只额外允许严格的 `asset://asset-*`。
 - 4K 只使用完整模型；联网搜索只允许纯文本；首尾帧必须保留 `first_frame` / `last_frame` 角色。
 - 连续视频必须串行，并在取得上一段 `last_frame_url` 后才能创建下一段。
 - Seedream 默认使用 `doubao-seedream-5-0-pro-260628`；组图、联网和流式按官方能力限制使用 Lite。Prompt 一键优化固定调用 `doubao-seed-evolving`，不能与图片 API 的 `optimize_prompt_options` 混为一谈。
 - Seedream 图片只允许公网 HTTPS URL 或受控图片 Base64；Pro 最多 10 张参考图，Lite 最多 14 张，组图输入与输出合计最多 15 张。故事书/连环画附录不进入产品。
 - Seedream 真实图片生成必须费用确认；Prompt 优化只在显式点击时调用。页面加载、示例切换、构建与自动化测试不得产生真实调用。
+- Seedream point/bbox 仅 Pro + 参考图启用，坐标标签只存在于 Prompt；禁止新增上游 annotations 字段或另一份持久化状态。图号按 image 数组顺序解释，Lite、越界图号、错误坐标/格式必须前后端同时阻止提交。
 - Seedream 生成先创建任务并保存恢复令牌，再由独立 `run` 请求执行长调用；D1 只保留任务状态、URL 格式结果与脱敏错误 24 小时。不得把 API Key、Prompt、参考图或完整请求写入 D1；`b64_json` 不进入可恢复任务。
 - Responses API 只使用标准 `https://ark.cn-beijing.volces.com/api/v3` 与普通方舟 Key。所有创建、查询、Input Items 和删除操作必须经同源 POST，不能开放任意 Base URL。
 - AI coding 栏目只使用仓库内模拟组织与指标数据；同源 GET 接口不得接入员工身份、真实代码内容、会话 Prompt、凭证或生产效能平台。页面不得把模拟数据表述为真实客户成效。
