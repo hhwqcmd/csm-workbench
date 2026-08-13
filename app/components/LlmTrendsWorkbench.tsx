@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CURRENT_LEADERBOARD_ROWS } from "../lib/llm-leaderboards";
 
 type BenchmarkKey =
   | "nl2Repo"
@@ -523,6 +524,61 @@ const TEXT_MODELS: TextModel[] = [
   },
   {
     vendor: "深度求索",
+    model: "DeepSeek-V4-Pro-0813",
+    release: "2026.08.13",
+    access: "开放权重 / API",
+    price: "¥3 / ¥6",
+    priceNote: "中国区缓存未命中输入 / 输出",
+    context: "1M",
+    parameters: "1.6T / 49B 激活",
+    officialUrl: "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+    metrics: {
+      nl2Repo: NA(
+        "https://artificialanalysis.ai/models/deepseek-v4-pro",
+        "AA 未发布 0813 的 NL2Repo 同名结果",
+      ),
+      sciCode: {
+        value: "49.2%",
+        score: 49.2,
+        source: "Artificial Analysis · SciCode / max",
+        href: "https://artificialanalysis.ai/models/deepseek-v4-pro",
+      },
+      ale: NA(
+        "https://artificialanalysis.ai/models/deepseek-v4-pro",
+        "AA 未发布 0813 的 ALE 同名结果",
+      ),
+      terminal: {
+        value: "78.7%",
+        score: 78.7,
+        source: "Artificial Analysis · Terminal-Bench 2.1 / max",
+        href: "https://artificialanalysis.ai/models/deepseek-v4-pro",
+      },
+      mcpAtlas: NA(
+        "https://artificialanalysis.ai/models/deepseek-v4-pro",
+        "AA 未发布 0813 的 MCP-Atlas 同名结果",
+      ),
+      swePro: NA(
+        "https://artificialanalysis.ai/models/deepseek-v4-pro",
+        "AA 未发布 0813 的 SWE Pro 同名结果",
+      ),
+      deepSwe: {
+        value: "8.6%",
+        score: 8.6,
+        source: "AA v1.3 · Claude Code / high",
+        href: "https://artificialanalysis.ai/agents/coding-agents",
+      },
+      osWorld: NA(
+        "https://artificialanalysis.ai/models/deepseek-v4-pro",
+        "AA 未发布 0813 的 OSWorld 同名结果",
+      ),
+      mmmuPro: NA(
+        "https://artificialanalysis.ai/models/deepseek-v4-pro",
+        "AA 尚无 0813 的 MMMU-Pro 成绩",
+      ),
+    },
+  },
+  {
+    vendor: "深度求索",
     model: "DeepSeek-V4-Flash-0731",
     release: "2026.07.31",
     access: "开放权重 / API",
@@ -575,6 +631,61 @@ const TEXT_MODELS: TextModel[] = [
       mmmuPro: NA(
         "https://api-docs.deepseek.com/zh-cn/updates/",
         "DeepSeek 官方未发布 MMMU-Pro 同名结果",
+      ),
+    },
+  },
+  {
+    vendor: "SpaceXAI",
+    model: "Grok 4.6",
+    release: "2026.08.12",
+    access: "闭源 API",
+    price: "$2 / $6",
+    priceNote: "<200K 输入 / 输出；≥200K 为 $4 / $12",
+    context: "500K",
+    parameters: "未披露",
+    officialUrl: "https://docs.x.ai/developers/grok-4-6",
+    metrics: {
+      nl2Repo: NA(
+        "https://x.ai/news/grok-4-6",
+        "xAI 与 AA 未发布 Grok 4.6 的 NL2Repo 同名结果",
+      ),
+      sciCode: {
+        value: "53.6%",
+        score: 53.6,
+        source: "Artificial Analysis · SciCode / high",
+        href: "https://artificialanalysis.ai/models/grok-4-6",
+      },
+      ale: NA(
+        "https://x.ai/news/grok-4-6",
+        "xAI 与 AA 未发布 Grok 4.6 的 ALE 同名结果",
+      ),
+      terminal: {
+        value: "88.4%",
+        score: 88.4,
+        source: "Artificial Analysis · Terminal-Bench 2.1 / high",
+        href: "https://artificialanalysis.ai/models/grok-4-6",
+      },
+      mcpAtlas: NA(
+        "https://x.ai/news/grok-4-6",
+        "xAI 与 AA 未发布 Grok 4.6 的 MCP-Atlas 同名结果",
+      ),
+      swePro: NA(
+        "https://x.ai/news/grok-4-6",
+        "xAI 与 AA 未发布 Grok 4.6 的 SWE Pro 同名结果",
+      ),
+      deepSwe: {
+        value: "65.9%",
+        score: 65.9,
+        source: "SpaceXAI 官方 · DeepSWE v1.1 / high",
+        href: "https://x.ai/news/grok-4-6",
+      },
+      osWorld: NA(
+        "https://x.ai/news/grok-4-6",
+        "xAI 与 AA 未发布 Grok 4.6 的 OSWorld 同名结果",
+      ),
+      mmmuPro: NA(
+        "https://artificialanalysis.ai/models/grok-4-6",
+        "AA 尚无 Grok 4.6 的 MMMU-Pro 成绩",
       ),
     },
   },
@@ -698,8 +809,8 @@ const MODEL_TRACKS: ModelTrack[] = [
     eyebrow: "TEXT / REASONING / AGENT",
     lead: "Doubao-Seed-2.1-Pro",
     summary: "价格、参数与九项单项 Benchmark。",
-    comparisonNote: "火山方舟与七家指定厂商；价格为每百万 tokens 输入 / 输出。",
-    scope: "火山方舟、Claude、GPT、Qwen、Kimi、GLM、DeepSeek、MiniMax。",
+    comparisonNote: "火山方舟与八家厂商；价格为每百万 tokens 输入 / 输出。",
+    scope: "火山方舟、Claude、GPT、Qwen、Kimi、GLM、DeepSeek、SpaceXAI、MiniMax。",
     models: [
       {
         vendor: "火山方舟",
@@ -837,7 +948,7 @@ const MODEL_TRACKS: ModelTrack[] = [
       },
       {
         vendor: "深度求索",
-        model: "DeepSeek-V4 Pro",
+        model: "DeepSeek-V4-Pro-0813",
         tier: "旗舰",
         price: "¥3 / ¥6",
         priceNote: "中国区缓存未命中输入 / 输出",
@@ -858,6 +969,17 @@ const MODEL_TRACKS: ModelTrack[] = [
         href: "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
       },
       {
+        vendor: "SpaceXAI",
+        model: "Grok 4.6",
+        tier: "旗舰 Agent",
+        price: "$2 / $6",
+        priceNote: "<200K 输入 / 输出；≥200K 为 $4 / $12",
+        parameters: "未披露",
+        specLabel: "上下文",
+        spec: "500K",
+        href: "https://docs.x.ai/developers/grok-4-6",
+      },
+      {
         vendor: "MiniMax",
         model: "MiniMax M3",
         tier: "旗舰",
@@ -876,7 +998,7 @@ const MODEL_TRACKS: ModelTrack[] = [
     eyebrow: "TEXT TO VIDEO",
     lead: "Seedance 2.5",
     summary: "最新发布：Seedance 2.5；Arena 可比版本：Seedance 2.0。",
-    comparisonNote: "纯生成、按输出秒比较：Seedance 系列为 720p、16:9、5 秒官方示例，H3 为 768P 刊例价；分辨率近似但不完全相同。",
+    comparisonNote: "按输出秒比较：Seedance 系列为 720p、16:9、5 秒官方示例，Wan3.0 为 720P 刊例价，H3 为 768P 刊例价；H3 分辨率近似但不完全相同。",
     scope: "火山方舟、OpenAI、阿里云、MiniMax。",
     models: [
       {
@@ -951,14 +1073,14 @@ const MODEL_TRACKS: ModelTrack[] = [
       },
       {
         vendor: "阿里云",
-        model: "Wan2.7 T2V",
-        tier: "旗舰",
-        price: "¥0.6–¥1 / 秒",
-        priceNote: "中国区 720p–1080p",
+        model: "Wan3.0 Video",
+        tier: "全能视频生成",
+        price: "¥0.60 / 秒",
+        priceNote: "720P；480P 为 ¥0.30 / 秒，1080P 为 ¥1.20 / 秒",
         parameters: "未披露",
-        specLabel: "时长",
-        spec: "2–15 秒",
-        href: "https://help.aliyun.com/zh/model-studio/wan2-7-t2v",
+        specLabel: "时长 / 限流",
+        spec: "最长 30 秒 · RPM 30",
+        href: "https://bailian.console.aliyun.com/cn-beijing?tab=model#/model-market/detail/wan3.0-video?serviceSite=asia-pacific-china&ref=all",
       },
       {
         vendor: "MiniMax",
@@ -1058,9 +1180,9 @@ const ARENA_BOARDS: Board[] = [
   {
     eyebrow: "TEXT",
     name: "Text / Overall",
-    snapshot: "2026-08-01 · Model ranking",
+    snapshot: "2026-08-12 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "DeepSeek V4 Flash：第 80，1436 ± 4；Arena 未标注 0731 版本。",
+    note: "Grok 4.6 High：第 43；deepseek-v4-pro：第 50。Arena 未显式标注 DeepSeek 的 0813 日期版本。",
     href: "https://arena.ai/leaderboard/text/overall",
     assessment: {
       source: "Arena FAQ 与排名方法",
@@ -1073,25 +1195,14 @@ const ARENA_BOARDS: Board[] = [
       ],
       summary: "开放文本的人类偏好相对排名。",
     },
-    rows: [
-      ["Claude Fable 5", "Anthropic", "1509 ± 6"],
-      ["Claude Opus 4.6 Thinking", "Anthropic", "1505 ± 4"],
-      ["Claude Opus 4.7 Thinking", "Anthropic", "1502 ± 4"],
-      ["Claude Opus 4.6", "Anthropic", "1497 ± 4"],
-      ["Qwen3.8 Max", "Alibaba", "1496 ± 10 · Preliminary"],
-      ["Claude Opus 4.7", "Anthropic", "1492 ± 4"],
-      ["Claude Opus 5 High", "Anthropic", "1492 ± 6"],
-      ["Claude Opus 5 Max", "Anthropic", "1490 ± 9 · Preliminary"],
-      ["Muse Spark 1.1", "Meta", "1490 ± 6 · Preliminary"],
-      ["Muse Spark", "Meta", "1488 ± 6 · Preliminary"],
-    ].map(([model, lab, value]) => ({ model, lab, value })),
+    rows: CURRENT_LEADERBOARD_ROWS["Text / Overall"],
   },
   {
     eyebrow: "CODE",
     name: "Coding Arena",
-    snapshot: "2026-08-01 · Model ranking",
+    snapshot: "2026-08-12 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "DeepSeek V4 Flash：第 81，1484 ± 6；Arena 未标注 0731 版本。",
+    note: "Grok 4.6 High：第 44；当前前 50 未出现 DeepSeek V4 Pro。",
     href: "https://arena.ai/leaderboard/text/coding",
     assessment: {
       source: "Arena Coding 分类说明",
@@ -1104,25 +1215,14 @@ const ARENA_BOARDS: Board[] = [
       ],
       summary: "Text Arena 代码样本的人类偏好排名。",
     },
-    rows: [
-      ["Claude Fable 5", "Anthropic", "1553 ± 9"],
-      ["Claude Opus 4.7 Thinking", "Anthropic", "1552 ± 6"],
-      ["Claude Opus 4.6 Thinking", "Anthropic", "1551 ± 6"],
-      ["Claude Opus 4.6", "Anthropic", "1548 ± 6"],
-      ["Claude Opus 4.7", "Anthropic", "1547 ± 6"],
-      ["Claude Opus 4.8 Thinking", "Anthropic", "1534 ± 7"],
-      ["Claude Opus 5 High", "Anthropic", "1532 ± 12"],
-      ["Kimi K3 Max", "Moonshot", "1531 ± 20 · Preliminary"],
-      ["Claude Opus 4.5 Thinking", "Anthropic", "1530 ± 7"],
-      ["Qwen3.8 Max", "Alibaba", "1530 ± 19 · Preliminary"],
-    ].map(([model, lab, value]) => ({ model, lab, value })),
+    rows: CURRENT_LEADERBOARD_ROWS["Coding Arena"],
   },
   {
     eyebrow: "WEBDEV",
     name: "WebDev Arena",
-    snapshot: "2026-08-01 · Model ranking",
+    snapshot: "2026-08-12 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "DeepSeek V4 Flash High：第 8，Preliminary；Arena 未标注 0731 版本。",
+    note: "Grok 4.6 High：第 5；deepseek-v4-pro：第 46。Arena 未显式标注 DeepSeek 的 0813 日期版本。",
     href: "https://arena.ai/leaderboard/code",
     assessment: {
       source: "Code Arena 官方方法",
@@ -1135,23 +1235,12 @@ const ARENA_BOARDS: Board[] = [
       ],
       summary: "综合功能、交互与视觉完成度。",
     },
-    rows: [
-      ["Claude Opus 5 Max", "Anthropic", "1705 +15/-15"],
-      ["Kimi K3 Max", "Moonshot", "1676 +12/-12"],
-      ["Claude Opus 5 High", "Anthropic", "1669 +11/-11"],
-      ["Qwen3.8 Max", "Alibaba", "1668 +18/-18 · Preliminary"],
-      ["Claude Fable 5", "Anthropic", "1630 +9/-9"],
-      ["GPT-5.6 Sol xhigh · Codex", "OpenAI", "1620 +9/-9"],
-      ["GLM-5.2 Max", "Z.ai", "1586 +9/-9"],
-      ["DeepSeek V4 Flash High", "DeepSeek", "1577 +18/-18 · Preliminary"],
-      ["Claude Opus 4.8 Thinking", "Anthropic", "1566 +8/-8"],
-      ["Claude Opus 4.7", "Anthropic", "1561 +7/-7"],
-    ].map(([model, lab, value]) => ({ model, lab, value })),
+    rows: CURRENT_LEADERBOARD_ROWS["WebDev Arena"],
   },
   {
     eyebrow: "VISION",
     name: "Vision Arena",
-    snapshot: "2026-07-26 · Lab ranking",
+    snapshot: "2026-08-06 · Model ranking",
     direction: "偏好 Elo ↑",
     note: "含图对话；实验室聚合。",
     href: "https://arena.ai/leaderboard/vision?rankBy=labs",
@@ -1166,30 +1255,14 @@ const ARENA_BOARDS: Board[] = [
       ],
       summary: "视觉理解回答的人类偏好排名。",
     },
-    rows: [
-      ["Claude Fable 5", "Anthropic", "1318 ± 9"],
-      ["Gemini 3.6 Flash", "Google", "1301 ± 38"],
-      ["Muse Spark", "Meta", "1295 ± 9"],
-      ["GPT-5.5", "OpenAI", "1287 ± 7"],
-      ["Grok 4.5", "xAI", "1282 ± 12"],
-      ["Kimi K2.6", "Moonshot", "1264 ± 7"],
-      ["Qwen3.7 Plus", "Alibaba", "1262 ± 9"],
-      ["Dola-Seed-2.0-Pro", "ByteDance", "1258 ± 8"],
-      ["MiniMax M3", "MiniMax", "1240 ± 8"],
-      ["MiMo V2.5", "Xiaomi", "1240 ± 7"],
-    ].map(([model, lab, value]) => ({
-      model,
-      lab,
-      value,
-      highlight: model.includes("Seed"),
-    })),
+    rows: CURRENT_LEADERBOARD_ROWS["Vision Arena"],
   },
   {
     eyebrow: "IMAGE",
     name: "Text-to-Image",
-    snapshot: "2026-07-10 · Model ranking",
+    snapshot: "2026-08-10 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "文本生图偏好；Seedream 5.0 Pro 当前第 11。",
+    note: "文本生图偏好；当前前 50 按模型配置列示。",
     href: "https://arena.ai/leaderboard/text-to-image",
     assessment: {
       source: "Image Arena 质量过滤",
@@ -1202,25 +1275,14 @@ const ARENA_BOARDS: Board[] = [
       ],
       summary: "同提示匿名生图偏好；不含图像编辑。",
     },
-    rows: [
-      ["GPT Image 2 · medium", "OpenAI", "1385 ± 5"],
-      ["Reve 2.1", "Reve", "1302 ± 12"],
-      ["Muse Image", "Meta", "1280 ± 8"],
-      ["Reve 2.0", "Reve", "1271 ± 6"],
-      ["Gemini 3.1 Flash Image · web search", "Google", "1261 ± 7"],
-      ["MAI Image 2.5", "Microsoft", "1257 ± 5"],
-      ["Gemini 3.1 Flash Lite Image", "Google", "1250 ± 8"],
-      ["Gemini 3 Pro Image 2K", "Google", "1245 ± 3"],
-      ["GPT Image 1.5 High Fidelity", "OpenAI", "1240 ± 3"],
-      ["Gemini 3 Pro Image Preview", "Google", "1232 ± 5"],
-    ].map(([model, lab, value]) => ({ model, lab, value })),
+    rows: CURRENT_LEADERBOARD_ROWS["Text-to-Image"],
   },
   {
     eyebrow: "VIDEO",
     name: "Text-to-Video",
-    snapshot: "2026-07-05 · Model ranking",
+    snapshot: "2026-08-10 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "文本生视频；Seedance 2.0 为当前可比版本。",
+    note: "文本生视频；榜单当前共发布 44 行，已全量录入；Seedance 2.0 为可比版本。",
     href: "https://arena.ai/leaderboard/text-to-video",
     assessment: {
       source: "Video Arena 官方说明",
@@ -1233,23 +1295,7 @@ const ARENA_BOARDS: Board[] = [
       ],
       summary: "同提示匿名视频偏好；无固定分项权重。",
     },
-    rows: [
-      ["Gemini Omni Flash", "Google", "1527 ± 13"],
-      ["Seedance 2.0 · 720p", "ByteDance", "1482 ± 10"],
-      ["Muse Video", "Meta", "1459 ± 15"],
-      ["HappyHorse 1.0", "Alibaba ATH", "1430 ± 13"],
-      ["Sora 2 Pro", "OpenAI", "1366 ± 8"],
-      ["Veo 3.1 Audio · 1080p", "Google", "1364 ± 11"],
-      ["Veo 3.1 Audio", "Google", "1364 ± 14"],
-      ["Veo 3.1 Fast Audio", "Google", "1362 ± 11"],
-      ["Veo 3.1 Fast Audio · 1080p", "Google", "1360 ± 10"],
-      ["Grok Imagine Video · 720p", "xAI", "1352 ± 8"],
-    ].map(([model, lab, value]) => ({
-      model,
-      lab,
-      value,
-      highlight: model.includes("Seedance"),
-    })),
+    rows: CURRENT_LEADERBOARD_ROWS["Text-to-Video"],
   },
 ];
 
@@ -1257,9 +1303,9 @@ const AA_BOARDS: Board[] = [
   {
     eyebrow: "INTELLIGENCE",
     name: "Intelligence Index v4.1",
-    snapshot: "2026-08-03 · model configurations",
+    snapshot: "2026-08-13 · model configurations",
     direction: "综合指数 ↑",
-    note: "DeepSeek V4 Flash 0731 · max：50；未进入 Top 10。",
+    note: "Grok 4.6 · high 第 6；DeepSeek V4 Pro 0813 · max 第 23；V4 Flash 0731 · max 第 29。",
     href: "https://artificialanalysis.ai/models",
     assessment: {
       source: "AA Intelligence 方法学",
@@ -1272,25 +1318,14 @@ const AA_BOARDS: Board[] = [
       ],
       summary: "9 项基准按 4 类不等权合成：Agents 34%，Coding 24%。",
     },
-    rows: [
-      ["Claude Opus 5 · max", "Anthropic", "61"],
-      ["Claude Opus 5 · xhigh", "Anthropic", "60"],
-      ["Claude Fable 5 · max + fallback", "Anthropic", "60"],
-      ["GPT-5.6 Sol · max", "OpenAI", "59"],
-      ["Claude Opus 5 · high", "Anthropic", "59"],
-      ["GPT-5.6 Sol · xhigh", "OpenAI", "58"],
-      ["Kimi K3 · max", "Moonshot", "57"],
-      ["Claude Opus 4.8 · max", "Anthropic", "56"],
-      ["GPT-5.6 Sol · high", "OpenAI", "56"],
-      ["GPT-5.6 Terra · max", "OpenAI", "55"],
-    ].map(([model, lab, value]) => ({ model, lab, value })),
+    rows: CURRENT_LEADERBOARD_ROWS["Intelligence Index v4.1"],
   },
   {
     eyebrow: "AA CODE",
     name: "Coding Agent Index",
-    snapshot: "2026-07-31 · v1.3 · model + harness",
+    snapshot: "2026-08-13 · v1.3 · model + harness",
     direction: "Agent 编程指数 ↑",
-    note: "0731 正式版尚未进入 AA v1.3 的 model + harness 配置榜。",
+    note: "当前仅 45 个配置有完整指数，已全量录入；尚无 Grok 4.6 或 DeepSeek V4 Pro 0813 的明确同名配置。",
     href: "https://artificialanalysis.ai/agents/coding-agents",
     assessment: {
       source: "AA Coding Agent 方法学",
@@ -1303,25 +1338,14 @@ const AA_BOARDS: Board[] = [
       ],
       summary: "模型、Agent harness 与推理设置共同计分。",
     },
-    rows: [
-      ["Claude Opus 5 xhigh · Claude Code", "Anthropic", "67"],
-      ["GPT-5.6 Sol max · Codex", "OpenAI", "67"],
-      ["Claude Fable 5 max · Claude Code", "Anthropic", "66"],
-      ["GPT-5.6 Sol xhigh · Codex", "OpenAI", "65"],
-      ["GPT-5.6 Sol high · Codex", "OpenAI", "64"],
-      ["Grok 4.5 high · Grok Build", "xAI", "64"],
-      ["GPT-5.6 Terra max · Codex", "OpenAI", "62"],
-      ["Kimi K3 · Kimi Code CLI", "Moonshot", "61"],
-      ["GPT-5.5 xhigh · Codex", "OpenAI", "61"],
-      ["GPT-5.6 Sol medium · Codex", "OpenAI", "61"],
-    ].map(([model, lab, value]) => ({ model, lab, value })),
+    rows: CURRENT_LEADERBOARD_ROWS["Coding Agent Index"],
   },
   {
     eyebrow: "AGENTIC",
     name: "Agentic Index",
-    snapshot: "2026-08-03 · Model configurations",
+    snapshot: "2026-08-13 · Model configurations",
     direction: "Agentic 指数 ↑",
-    note: "DeepSeek V4 Flash 0731 · max：46；未进入 Top 10。",
+    note: "Grok 4.6 · high 第 2；DeepSeek V4 Pro 0813 · max 第 14；V4 Flash 0731 · max 第 18。",
     href: "https://artificialanalysis.ai/models/capabilities/agentic/",
     assessment: {
       source: "AA Agentic Index 说明",
@@ -1334,25 +1358,14 @@ const AA_BOARDS: Board[] = [
       ],
       summary: "职业任务与银行工具任务各占 50%。",
     },
-    rows: [
-      ["Claude Opus 5 · max", "Anthropic", "55"],
-      ["Claude Opus 5 · xhigh", "Anthropic", "55"],
-      ["GPT-5.6 Sol · max", "OpenAI", "54"],
-      ["Claude Fable 5 · max + fallback", "Anthropic", "53"],
-      ["GPT-5.6 Sol · xhigh", "OpenAI", "52"],
-      ["Claude Opus 5 · high", "Anthropic", "52"],
-      ["Kimi K3 · max", "Moonshot", "51"],
-      ["Grok 4.5 · high", "xAI", "50"],
-      ["GPT-5.5 · xhigh", "OpenAI", "49"],
-      ["GLM-5.2 · max", "Z.ai", "48"],
-    ].map(([model, lab, value]) => ({ model, lab, value })),
+    rows: CURRENT_LEADERBOARD_ROWS["Agentic Index"],
   },
   {
     eyebrow: "KNOWLEDGE WORK",
     name: "AA-Briefcase",
-    snapshot: "2026-07-31 · Elo leaderboard",
+    snapshot: "2026-08-13 · Elo leaderboard",
     direction: "综合 Elo ↑",
-    note: "0731 正式版尚无 AA-Briefcase 同名配置成绩。",
+    note: "Grok 4.6 · high 第 4；DeepSeek V4 Flash 0731 · max 第 15；0813 暂无同名成绩。",
     href: "https://artificialanalysis.ai/evaluations/aa-briefcase",
     assessment: {
       source: "AA-Briefcase 方法学",
@@ -1365,18 +1378,7 @@ const AA_BOARDS: Board[] = [
       ],
       summary: "Rubric 与两项 Elo 综合；固定权重未公开。",
     },
-    rows: [
-      ["Claude Opus 5 · max", "Anthropic", "1721"],
-      ["Claude Opus 5 · xhigh", "Anthropic", "1693"],
-      ["Claude Opus 5 · high", "Anthropic", "1606"],
-      ["Claude Fable 5 · max + fallback", "Anthropic", "1574"],
-      ["Kimi K3", "Moonshot", "1540"],
-      ["GPT-5.6 Sol · max", "OpenAI", "1504"],
-      ["Claude Opus 5 · medium", "Anthropic", "1470"],
-      ["Claude Sonnet 5 · max", "Anthropic", "1386"],
-      ["Claude Opus 4.8 · max", "Anthropic", "1345"],
-      ["Grok 4.5 · high", "xAI", "1317"],
-    ].map(([model, lab, value]) => ({ model, lab, value })),
+    rows: CURRENT_LEADERBOARD_ROWS["AA-Briefcase"],
   },
 ];
 
@@ -1396,6 +1398,9 @@ const SOURCES = [
   ["GLM-5.2 官方模型卡", "https://huggingface.co/zai-org/GLM-5.2"],
   ["DeepSeek 中国区价格", "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"],
   ["DeepSeek V4 Flash 0731 官方更新", "https://api-docs.deepseek.com/zh-cn/updates/"],
+  ["DeepSeek V4 Pro 0813 · Artificial Analysis", "https://artificialanalysis.ai/models/deepseek-v4-pro"],
+  ["SpaceXAI Grok 4.6 官方发布", "https://x.ai/news/grok-4-6"],
+  ["SpaceXAI Grok 4.6 模型与价格", "https://docs.x.ai/developers/grok-4-6"],
   ["MiniMax 中国区价格", "https://platform.minimaxi.com/docs/guides/pricing-paygo"],
   ["MiniMax M3 官方发布", "https://www.minimax.io/blog/minimax-m3"],
   ["LLM Stats 单项测评", "https://llm-stats.com/benchmarks"],
@@ -1440,7 +1445,7 @@ function BoardCard({ board, provider }: { board: Board; provider: string }) {
         <p className="trend-board-note">{board.note}</p>
       </header>
       <ol>
-        {board.rows.slice(0, 10).map((row, index) => (
+        {board.rows.slice(0, 50).map((row, index) => (
           <li className={row.highlight ? "is-highlight" : ""} key={`${board.name}-${row.model}`}>
             <span>{String(index + 1).padStart(2, "0")}</span>
             <div><strong>{row.model}</strong><small>{row.lab}</small></div>
@@ -1492,7 +1497,7 @@ export function LlmTrendsWorkbench() {
     <div className="llm-trends" id="llm-trends">
       <section className="trends-hero">
         <div className="trends-hero-copy">
-          <div className="trends-kicker"><span className="trends-live-dot" />MARKET SNAPSHOT · 2026.08.04</div>
+          <div className="trends-kicker"><span className="trends-live-dot" />MARKET SNAPSHOT · 2026.08.13</div>
           <h1>LLM<br />趋势</h1>
           <p>主力模型、Agent Benchmark 与第三方榜单。</p>
           <div className="trends-hero-actions">
@@ -1503,7 +1508,7 @@ export function LlmTrendsWorkbench() {
         <aside className="trends-radar" aria-label="趋势栏目数据口径">
           <div className="trends-radar-head"><span>RESEARCH LENS</span><strong>官方优先</strong></div>
           <div className="trends-radar-orbit"><span className="trends-radar-ring trends-radar-ring-one" /><span className="trends-radar-ring trends-radar-ring-two" /><span className="trends-radar-ring trends-radar-ring-three" /><strong>03</strong><small>模型赛道</small></div>
-          <dl className="trends-radar-stats"><div><dt>07</dt><dd>指定友商</dd></div><div><dt>09</dt><dd>单项基准</dd></div><div><dt>10</dt><dd>Top 10 榜单</dd></div></dl>
+          <dl className="trends-radar-stats"><div><dt>08</dt><dd>指定友商</dd></div><div><dt>09</dt><dd>单项基准</dd></div><div><dt>50</dt><dd>单榜最多名次</dd></div></dl>
           <p>官方与第三方来源独立标注；未披露项不推算。</p>
         </aside>
       </section>
@@ -1623,7 +1628,7 @@ export function LlmTrendsWorkbench() {
       </section>
 
       <section className="trends-section trends-leaderboard-section" id="leaderboards">
-        <div className="trends-section-heading trends-section-heading-light"><div><p>INDEPENDENT SIGNALS</p><h2>第三方测评</h2></div><span>Artificial Analysis 4 项；LMArena 6 项；各取 Top 10。</span></div>
+        <div className="trends-section-heading trends-section-heading-light"><div><p>INDEPENDENT SIGNALS</p><h2>第三方测评</h2></div><span>Artificial Analysis 4 项；LMArena 6 项；各取前 50，不足则全量。</span></div>
         <div className="trend-provider-switch" role="group" aria-label="选择排行榜平台">
           <button
             aria-pressed={leaderboardProvider === "aa"}
@@ -1672,13 +1677,13 @@ export function LlmTrendsWorkbench() {
           ))}
         </div>
         <BoardCard board={activeBoard} provider={providerMeta.label} />
-        <p className="trends-leaderboard-note">快照数据；preliminary、reasoning effort 与置信区间按原榜口径保留。</p>
+        <p className="trends-leaderboard-note">当前榜已录入 {activeBoard.rows.length} 条；preliminary、reasoning effort 与置信区间按原榜口径保留。</p>
       </section>
 
       <section className="trends-section trends-sources-section" id="trend-sources">
         <div className="trends-section-heading"><div><p>SOURCE LEDGER</p><h2>数据来源</h2></div><span>厂商官网优先；缺失项使用独立榜单。</span></div>
         <div className="trends-source-grid trend-source-grid-compact">{SOURCES.map(([label, href]) => <article key={href}><a href={href} target="_blank" rel="noreferrer"><span>{label}</span><b>↗</b></a></article>)}</div>
-        <div className="trends-method-note"><strong>范围</strong><p>截至 2026-08-04 可核验的正式模型；静态快照，不自动抓榜或调用 API。</p></div>
+        <div className="trends-method-note"><strong>范围</strong><p>截至 2026-08-13 可核验的正式模型；静态快照，不自动抓榜或调用 API。</p></div>
       </section>
     </div>
   );

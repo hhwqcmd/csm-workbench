@@ -400,9 +400,18 @@ test("server-renders the LLM trends research snapshot without live API work", as
     new URL("../app/components/LlmTrendsWorkbench.tsx", import.meta.url),
     "utf8",
   );
+  const leaderboardSource = await readFile(
+    new URL("../app/lib/llm-leaderboards.ts", import.meta.url),
+    "utf8",
+  );
+  const leaderboardJson = leaderboardSource.match(
+    /CURRENT_LEADERBOARD_ROWS = (\{[\s\S]*\}) satisfies Record/,
+  );
+  assert.ok(leaderboardJson);
+  const leaderboardRows = JSON.parse(leaderboardJson[1]);
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
-  assert.match(html, /MARKET SNAPSHOT · 2026\.08\.04/);
+  assert.match(html, /MARKET SNAPSHOT · 2026\.08\.13/);
   assert.match(html, /LLM/);
   assert.match(html, /第三方测评/);
   assert.doesNotMatch(html, /文本模型 Benchmark/);
@@ -423,7 +432,9 @@ test("server-renders the LLM trends research snapshot without live API work", as
     "Qwen3.8-Max",
     "Kimi K3",
     "GLM-5.2",
+    "DeepSeek-V4-Pro-0813",
     "DeepSeek-V4-Flash-0731",
+    "Grok 4.6",
     "MiniMax M3",
   ]) {
     assert.match(html, new RegExp(model.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -434,10 +445,12 @@ test("server-renders the LLM trends research snapshot without live API work", as
     "GPT-5.6 Terra",
     "GPT-5.6 Luna",
     "Qwen3.7-Plus",
+    "DeepSeek-V4-Pro-0813",
     "DeepSeek-V4-Flash-0731",
+    "Grok 4.6",
     "Sora 2 Pro",
     "Sora 2",
-    "Wan2.7 T2V",
+    "Wan3.0 Video",
     "MiniMax H3",
     "Doubao-Seedance-2.0",
     "Doubao-Seedance-2.0-Fast",
@@ -477,7 +490,12 @@ test("server-renders the LLM trends research snapshot without live API work", as
     source,
     /model: "MiniMax H3",[\s\S]*?price: "¥0\.50 \/ 秒",[\s\S]*?priceNote: "768P 输出；2K 为 ¥0\.80 \/ 秒"/,
   );
-  assert.match(source, /纯生成、按输出秒比较：Seedance 系列为 720p、16:9、5 秒官方示例，H3 为 768P 刊例价/);
+  assert.match(
+    source,
+    /model: "Wan3\.0 Video",[\s\S]*?price: "¥0\.60 \/ 秒",[\s\S]*?priceNote: "720P；480P 为 ¥0\.30 \/ 秒，1080P 为 ¥1\.20 \/ 秒"[\s\S]*?spec: "最长 30 秒 · RPM 30"/,
+  );
+  assert.doesNotMatch(source, /Wan2\.7 T2V/);
+  assert.match(source, /按输出秒比较：Seedance 系列为 720p、16:9、5 秒官方示例，Wan3\.0 为 720P 刊例价，H3 为 768P 刊例价/);
   assert.match(source, /const \[expandedTrack, setExpandedTrack\] = useState<TrackId \| null>\(null\)/);
   assert.match(source, /aria-expanded=\{expandedTrack === track\.id\}/);
   assert.match(source, /current === track\.id \? null : track\.id/);
@@ -516,6 +534,14 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.match(source, /value: "25\.2%"[\s\S]*?Agent Last Exam \/ Agent 框架未单独披露/);
   assert.match(source, /value: "54\.4%"[\s\S]*?DeepSeek 官方 · DeepSeek Harness 极简模式 \/ max/);
   assert.match(source, /model: "DeepSeek-V4-Flash-0731"[\s\S]*?price: "¥1 \/ ¥2"/);
+  assert.match(
+    source,
+    /model: "DeepSeek-V4-Pro-0813"[\s\S]*?price: "¥3 \/ ¥6"[\s\S]*?value: "49\.2%"[\s\S]*?Artificial Analysis · SciCode \/ max[\s\S]*?value: "78\.7%"[\s\S]*?Terminal-Bench 2\.1 \/ max[\s\S]*?value: "8\.6%"[\s\S]*?AA v1\.3 · Claude Code \/ high/,
+  );
+  assert.match(
+    source,
+    /model: "Grok 4\.6"[\s\S]*?price: "\$2 \/ \$6"[\s\S]*?value: "53\.6%"[\s\S]*?Artificial Analysis · SciCode \/ high[\s\S]*?value: "88\.4%"[\s\S]*?Terminal-Bench 2\.1 \/ high[\s\S]*?value: "65\.9%"[\s\S]*?SpaceXAI 官方 · DeepSWE v1\.1 \/ high/,
+  );
   assert.match(source, /model: "Qwen3\.8-Max"[\s\S]*?parameters: "2\.4T \/ 95B 激活"/);
   assert.match(source, /value: "86\.6%"[\s\S]*?Qwen 官方 · Claude Code \/ avg@10/);
   assert.match(source, /value: "67\.7%"[\s\S]*?Qwen 官方 · Claude Code/);
@@ -526,8 +552,28 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.match(source, /value: "82\.3%"[\s\S]*?Qwen 官方 · 内部评估 \/ 无 Agent 框架/);
   assert.match(source, /Qwen 官方未发布 SciCode \/ Agent 框架/);
   assert.match(source, /DeepSeek 官方未发布 SciCode 同名结果/);
-  assert.match(source, /DeepSeek V4 Flash High[\s\S]*?1577 \+18\/-18 · Preliminary/);
-  assert.match(source, /DeepSeek V4 Flash 0731 · max：50；未进入 Top 10/);
+  assert.match(source, /board\.rows\.slice\(0, 50\)/);
+  assert.match(source, /各取前 50，不足则全量/);
+  for (const board of [
+    "Text / Overall",
+    "Coding Arena",
+    "WebDev Arena",
+    "Vision Arena",
+    "Text-to-Image",
+    "Intelligence Index v4.1",
+    "Agentic Index",
+    "AA-Briefcase",
+  ]) {
+    assert.equal(leaderboardRows[board].length, 50, `${board} should store 50 rows`);
+  }
+  assert.equal(leaderboardRows["Text-to-Video"].length, 44);
+  assert.equal(leaderboardRows["Coding Agent Index"].length, 45);
+  assert.equal(leaderboardRows["Text / Overall"][42].model, "grok-4.6-high");
+  assert.equal(leaderboardRows["Text / Overall"][49].model, "deepseek-v4-pro");
+  assert.equal(leaderboardRows["Intelligence Index v4.1"][22].model, "DeepSeek V4 Pro 0813 (max)");
+  assert.equal(leaderboardRows["Intelligence Index v4.1"][28].model, "DeepSeek V4 Flash 0731 (max)");
+  assert.equal(leaderboardRows["Agentic Index"][1].model, "Grok 4.6 (high)");
+  assert.equal(leaderboardRows["Agentic Index"][13].model, "DeepSeek V4 Pro 0813 (max)");
   assert.match(source, /Qwen 官方未发布 MCP-Atlas \/ Agent 框架/);
   assert.doesNotMatch(source, /label: "AA Coding Agent Index"/);
   assert.match(source, /model: "Claude Opus 4\.6"/);
