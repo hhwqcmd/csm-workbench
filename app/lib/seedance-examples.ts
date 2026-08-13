@@ -1,3 +1,10 @@
+import type {
+  SeedanceOutputFormat,
+  SeedanceOmniReferenceTaskType,
+  SeedanceRatio,
+  SeedanceResolution,
+} from "./seedance-config";
+
 export type SeedanceMediaType = "image_url" | "video_url" | "audio_url";
 export type SeedanceImageRole =
   | "reference_image"
@@ -29,9 +36,11 @@ export type SeedanceRequestBody = {
   model: string;
   content: SeedanceContentItem[];
   generate_audio?: boolean;
-  resolution?: "480p" | "720p" | "1080p" | "4k";
-  ratio: "adaptive" | "21:9" | "16:9" | "4:3" | "1:1" | "3:4" | "9:16";
+  resolution?: SeedanceResolution;
+  ratio: SeedanceRatio;
   duration: number;
+  output_format?: SeedanceOutputFormat;
+  omni_reference_task_type?: SeedanceOmniReferenceTaskType;
   watermark: boolean;
   return_last_frame?: boolean;
   tools?: Array<{ type: "web_search" }>;

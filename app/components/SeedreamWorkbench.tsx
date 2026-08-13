@@ -11,6 +11,16 @@ import {
   type SeedreamRequestBody,
 } from "../lib/seedream-examples";
 import {
+  appendSeedreamBbox,
+  appendSeedreamPoint,
+  clearSeedreamAnnotations,
+  normalizeSeedreamPoint,
+  parseSeedreamAnnotations,
+  removeSeedreamAnnotation,
+  validateSeedreamAnnotations,
+  type SeedreamAnnotation,
+} from "../lib/seedream-annotations";
+import {
   hasSavedMaterial,
   importGeneratedMaterial,
   readMaterialAssets,
@@ -99,8 +109,24 @@ export function SeedreamWorkbench() {
   const [latestResponse, setLatestResponse] = useState<unknown>();
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [selectedLogId, setSelectedLogId] = useState("");
+  const [annotationMode, setAnnotationMode] =
+    useState<"point" | "bbox">("point");
+  const [selectedAnnotationImage, setSelectedAnnotationImage] = useState(0);
+  const [annotationPreviewFailures, setAnnotationPreviewFailures] = useState<
+    Record<number, boolean>
+  >({});
+  const [imageOrderNotice, setImageOrderNotice] = useState(false);
+  const [bboxDrag, setBboxDrag] = useState<{
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const pollingJobRef = useRef("");
   const pollingAbortRef = useRef<AbortController | null>(null);
+  const bboxDragRef = useRef<typeof bboxDrag>(null);
 
   const active = status === "optimizing" || status === "generating";
   const generationEndpoint = `${SEEDREAM_BASE_URL}/images/generations`;
@@ -108,6 +134,33 @@ export function SeedreamWorkbench() {
   const imageText = Array.isArray(requestBody.image)
     ? requestBody.image.join("\n")
     : (requestBody.image ?? "");
+  const referenceImages = useMemo(
+    () =>
+      Array.isArray(requestBody.image)
+        ? requestBody.image
+        : requestBody.image
+          ? [requestBody.image]
+          : [],
+    [requestBody.image],
+  );
+  const annotations = useMemo(
+    () => parseSeedreamAnnotations(requestBody.prompt),
+    [requestBody.prompt],
+  );
+  const annotationErrors = useMemo(
+    () =>
+      validateSeedreamAnnotations({
+        prompt: requestBody.prompt,
+        imageCount: referenceImages.length,
+        model: requestBody.model,
+      }),
+    [referenceImages.length, requestBody.model, requestBody.prompt],
+  );
+  const selectedImageAnnotations = annotations.filter(
+    (annotation) => annotation.imageNumber === selectedAnnotationImage + 1,
+  );
+  const annotationEnabled =
+    requestBody.model === SEEDREAM_DEFAULT_MODEL && referenceImages.length > 0;
   const requestJson = useMemo(
     () => JSON.stringify(requestBody, null, 2),
     [requestBody],
@@ -118,6 +171,7 @@ export function SeedreamWorkbench() {
     Boolean(apiKey.trim()) &&
     Boolean(requestBody.prompt.trim()) &&
     requestBody.response_format !== "b64_json" &&
+    annotationErrors.length === 0 &&
     costConfirmed &&
     !active;
 
@@ -296,6 +350,9 @@ export function SeedreamWorkbench() {
     setBulkSaveState("idle");
     setBulkSaveError("");
     setLatestResponse(undefined);
+    setSelectedAnnotationImage(0);
+    setAnnotationPreviewFailures({});
+    setImageOrderNotice(false);
     window.history.replaceState(null, "", `#seedream-${example.id}`);
     window.setTimeout(() => {
       document
@@ -331,7 +388,124 @@ export function SeedreamWorkbench() {
       }
       return next;
     });
+    setAnnotationPreviewFailures({});
+    setSelectedAnnotationImage((current) =>
+      Math.min(current, Math.max(0, urls.length - 1)),
+    );
+    setImageOrderNotice(true);
     setCostConfirmed(false);
+  }
+
+  function handleAnnotationPointerDown(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    if (
+      !annotationEnabled ||
+      annotationPreviewFailures[selectedAnnotationImage]
+    ) {
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const localX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const localY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    if (annotationMode === "point") {
+      const normalized = normalizeSeedreamPoint(
+        localX,
+        localY,
+        rect.width,
+        rect.height,
+      );
+      patchBody({
+        prompt: appendSeedreamPoint(
+          requestBody.prompt,
+          selectedAnnotationImage + 1,
+          normalized.x,
+          normalized.y,
+        ),
+      });
+      return;
+    }
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const nextDrag = {
+      startX: localX,
+      startY: localY,
+      currentX: localX,
+      currentY: localY,
+      width: rect.width,
+      height: rect.height,
+    };
+    bboxDragRef.current = nextDrag;
+    setBboxDrag(nextDrag);
+  }
+
+  function handleAnnotationPointerMove(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    if (!bboxDragRef.current) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const nextDrag = {
+      ...bboxDragRef.current,
+      currentX: Math.max(
+        0,
+        Math.min(rect.width, event.clientX - rect.left),
+      ),
+      currentY: Math.max(
+        0,
+        Math.min(rect.height, event.clientY - rect.top),
+      ),
+    };
+    bboxDragRef.current = nextDrag;
+    setBboxDrag(nextDrag);
+  }
+
+  function handleAnnotationPointerUp(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    if (!bboxDragRef.current) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const drag = bboxDragRef.current;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const endX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const endY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    bboxDragRef.current = null;
+    setBboxDrag(null);
+    if (
+      Math.hypot(
+        endX - drag.startX,
+        endY - drag.startY,
+      ) < 4
+    ) {
+      return;
+    }
+    const first = normalizeSeedreamPoint(
+      drag.startX,
+      drag.startY,
+      drag.width,
+      drag.height,
+    );
+    const second = normalizeSeedreamPoint(
+      endX,
+      endY,
+      drag.width,
+      drag.height,
+    );
+    if (first.x === second.x || first.y === second.y) return;
+    patchBody({
+      prompt: appendSeedreamBbox(
+        requestBody.prompt,
+        selectedAnnotationImage + 1,
+        first,
+        second,
+      ),
+    });
+  }
+
+  function deleteAnnotation(annotation: SeedreamAnnotation) {
+    patchBody({
+      prompt: removeSeedreamAnnotation(requestBody.prompt, annotation),
+    });
   }
 
   function setSequentialMode(value: "disabled" | "auto") {
@@ -386,6 +560,9 @@ export function SeedreamWorkbench() {
         throw new Error("Request Body 至少需要 model、prompt 和 size。");
       }
       setRequestBody(body);
+      setSelectedAnnotationImage(0);
+      setAnnotationPreviewFailures({});
+      setImageOrderNotice(true);
       setApiEditing(false);
       setApiDraftError("");
       setCostConfirmed(false);
@@ -761,6 +938,216 @@ export function SeedreamWorkbench() {
                   value={imageText}
                 />
               </label>
+              <div className="seedream-annotation-editor seedream-field-wide">
+                <div className="seedream-annotation-heading">
+                  <div>
+                    <span className="seedream-annotation-kicker">PROMPT NATIVE</span>
+                    <strong>point / bbox 坐标标注</strong>
+                    <small>Prompt 是唯一事实源，坐标按当前渲染图归一化为 0–999。</small>
+                  </div>
+                  <div className="seedream-annotation-toolbar">
+                    <span>标注工具</span>
+                    <div className="seedream-annotation-tools">
+                      <button
+                        className={annotationMode === "point" ? "is-active" : undefined}
+                        disabled={!annotationEnabled || active}
+                        onClick={() => {
+                          bboxDragRef.current = null;
+                          setBboxDrag(null);
+                          setAnnotationMode("point");
+                        }}
+                        type="button"
+                      >
+                        point 点选
+                      </button>
+                      <button
+                        className={annotationMode === "bbox" ? "is-active" : undefined}
+                        disabled={!annotationEnabled || active}
+                        onClick={() => {
+                          bboxDragRef.current = null;
+                          setBboxDrag(null);
+                          setAnnotationMode("bbox");
+                        }}
+                        type="button"
+                      >
+                        bbox 框选
+                      </button>
+                      <button
+                        disabled={annotations.length === 0 || active}
+                        onClick={() => {
+                          const last = annotations.at(-1);
+                          if (last) deleteAnnotation(last);
+                        }}
+                        type="button"
+                      >
+                        撤销
+                      </button>
+                      <button
+                        disabled={annotations.length === 0 || active}
+                        onClick={() =>
+                          patchBody({
+                            prompt: clearSeedreamAnnotations(requestBody.prompt),
+                          })
+                        }
+                        type="button"
+                      >
+                        清空
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {referenceImages.length > 0 ? (
+                  <>
+                    <div className="seedream-image-tabs" role="tablist">
+                      {referenceImages.map((imageUrl, index) => (
+                        <button
+                          aria-selected={selectedAnnotationImage === index}
+                          className={
+                            selectedAnnotationImage === index
+                              ? "is-active"
+                              : undefined
+                          }
+                          key={`${index}-${imageUrl.slice(0, 32)}`}
+                          onClick={() => {
+                            setSelectedAnnotationImage(index);
+                            bboxDragRef.current = null;
+                            setBboxDrag(null);
+                          }}
+                          role="tab"
+                          type="button"
+                        >
+                          图{index + 1}
+                        </button>
+                      ))}
+                    </div>
+                    {imageOrderNotice && referenceImages.length > 1 && (
+                      <p className="seedream-annotation-notice">
+                        图N 严格对应 image 数组当前顺序；调整 URL 行顺序会改变 Prompt
+                        中已有标注的语义，本工作台不会静默重映射。
+                      </p>
+                    )}
+                    {annotationPreviewFailures[selectedAnnotationImage] ? (
+                      <p className="seedream-annotation-preview-error">
+                        图{selectedAnnotationImage + 1} 预览失败；该图的可视化标注已禁用，
+                        可修复 URL 或继续手工编辑 Prompt。
+                      </p>
+                    ) : (
+                      <div className="seedream-annotation-canvas-shell">
+                        <div className="seedream-annotation-context">
+                          <strong>当前画布 · 图{selectedAnnotationImage + 1}</strong>
+                          <span>
+                            {annotationMode === "point"
+                              ? "点击主体关键位置添加 point"
+                              : "拖拽框选主体区域添加 bbox"}
+                          </span>
+                        </div>
+                        <div className="seedream-annotation-stage">
+                          {/* External reference URLs must be rendered as-is for coordinate mapping. */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            alt={`参考图 ${selectedAnnotationImage + 1}`}
+                            onError={() =>
+                              setAnnotationPreviewFailures((current) => ({
+                                ...current,
+                                [selectedAnnotationImage]: true,
+                              }))
+                            }
+                            src={referenceImages[selectedAnnotationImage]}
+                          />
+                          <div
+                            aria-label={`在图${selectedAnnotationImage + 1}上添加${annotationMode}标注`}
+                            className={`seedream-annotation-overlay mode-${annotationMode}`}
+                            onPointerCancel={() => {
+                              bboxDragRef.current = null;
+                              setBboxDrag(null);
+                            }}
+                            onPointerDown={handleAnnotationPointerDown}
+                            onPointerMove={handleAnnotationPointerMove}
+                            onPointerUp={handleAnnotationPointerUp}
+                          >
+                            {selectedImageAnnotations.map((annotation, index) =>
+                              annotation.type === "point" ? (
+                                <span
+                                  className="seedream-point-marker"
+                                  key={annotation.id}
+                                  style={{
+                                    left: `${annotation.coordinates[0] / 9.99}%`,
+                                    top: `${annotation.coordinates[1] / 9.99}%`,
+                                  }}
+                                >
+                                  {index + 1}
+                                </span>
+                              ) : (
+                                <span
+                                  className="seedream-bbox-marker"
+                                  key={annotation.id}
+                                  style={{
+                                    left: `${annotation.coordinates[0] / 9.99}%`,
+                                    top: `${annotation.coordinates[1] / 9.99}%`,
+                                    width: `${(annotation.coordinates[2] - annotation.coordinates[0]) / 9.99}%`,
+                                    height: `${(annotation.coordinates[3] - annotation.coordinates[1]) / 9.99}%`,
+                                  }}
+                                >
+                                  {index + 1}
+                                </span>
+                              ),
+                            )}
+                            {bboxDrag && (
+                              <span
+                                className="seedream-bbox-marker is-draft"
+                                style={{
+                                  left: `${(Math.min(bboxDrag.startX, bboxDrag.currentX) / bboxDrag.width) * 100}%`,
+                                  top: `${(Math.min(bboxDrag.startY, bboxDrag.currentY) / bboxDrag.height) * 100}%`,
+                                  width: `${(Math.abs(bboxDrag.currentX - bboxDrag.startX) / bboxDrag.width) * 100}%`,
+                                  height: `${(Math.abs(bboxDrag.currentY - bboxDrag.startY) / bboxDrag.height) * 100}%`,
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="seedream-annotation-notice">
+                    添加至少一张参考图后，可在 Seedream 5.0 Pro 中启用坐标标注。
+                  </p>
+                )}
+                {requestBody.model !== SEEDREAM_DEFAULT_MODEL && (
+                  <p className="seedream-annotation-preview-error">
+                    Lite 不支持坐标标注；Prompt 中已有标签会保留，但必须切回 Pro
+                    或删除标签后才能真实提交。
+                  </p>
+                )}
+                {annotations.length > 0 && (
+                  <div className="seedream-annotation-ledger">
+                    <div>
+                      <strong>Prompt 标注清单</strong>
+                      <small>{annotations.length} 项 · 点击标签可删除</small>
+                    </div>
+                    <div className="seedream-annotation-chips">
+                      {annotations.map((annotation) => (
+                        <button
+                          className={`is-${annotation.type}`}
+                          key={annotation.id}
+                          onClick={() => deleteAnnotation(annotation)}
+                          title="删除 Prompt 中这一处具体标签"
+                          type="button"
+                        >
+                          {annotation.raw} ×
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {annotationErrors.length > 0 && (
+                  <ul className="seedream-annotation-errors">
+                    {annotationErrors.map((annotationError) => (
+                      <li key={annotationError}>{annotationError}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </section>
 
             <section className="seedream-panel seedream-tips">

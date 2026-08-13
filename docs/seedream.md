@@ -76,6 +76,17 @@ SeedreamWorkbench Prompt 优化按钮
 - 后台任务可处理非流式或上游 SSE，结果完成后统一写入短期状态；页面轮询同源任务状态。
 - 可刷新恢复的后台任务要求 `response_format=url`，不把大体积 Base64 图片写入 D1。
 
+## point / bbox 坐标标注
+
+Seedream 5.0 Pro 在存在参考图时提供 Prompt 原生坐标标注；Lite 保留 Prompt 文本但禁用可视化，并拒绝带坐标标签的真实提交。
+
+- point 格式：`图N<point>x y</point>`；bbox 格式：`图N<bbox>x1 y1 x2 y2</bbox>`。坐标按实际渲染图片宽高归一化并 clamp 到 0–999，bbox 必须满足 `x1 < x2`、`y1 < y2`。
+- 图片标签页中的 `图N` 严格对应当前 `image` 数组顺序。调整 URL 行顺序会改变已有标签语义，页面会提示但不会猜测重映射。
+- 点击 point 或拖拽 bbox 只会向 Prompt 追加标准标签，不新增上游 Request Body 字段。小于 4px 的拖拽不生成标注。
+- Prompt 是唯一事实源：覆盖层和标注芯片每次都从 Prompt 重新解析；手工编辑 Prompt、应用完整 JSON、删除具体 occurrence、撤销和清空都会同步恢复画布状态。
+- 图片删除后仍引用不存在图号、坐标越界、标签格式错误或 bbox 顺序错误时，前端禁用真实提交，服务端执行同样校验。
+- 单张图片预览失败只禁用该图的可视化标注；用户仍可修复 URL 或手工编辑 Prompt。本期不提供箭头、涂鸦、蒙版、图层或画布缩放平移。
+
 ## 历史、日志与大响应
 
 - 最近 30 次图片生成或 Prompt 优化保存在当前浏览器。

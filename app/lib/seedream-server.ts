@@ -7,6 +7,7 @@ import {
   type SeedreamModel,
   type SeedreamRequestBody,
 } from "./seedream-examples";
+import { validateSeedreamAnnotations } from "./seedream-annotations";
 
 export class SeedreamValidationError extends Error {}
 
@@ -162,6 +163,15 @@ function parseRequestBody(value: unknown): SeedreamRequestBody {
   const model = parseModel(body.model);
   const prompt = requiredString(body.prompt, "prompt", 10_000);
   const image = parseImages(body.image, model);
+  const imageCount = Array.isArray(image) ? image.length : image ? 1 : 0;
+  const annotationErrors = validateSeedreamAnnotations({
+    prompt,
+    imageCount,
+    model,
+  });
+  if (annotationErrors.length > 0) {
+    throw new SeedreamValidationError(annotationErrors[0]);
+  }
   const size = parseSize(body.size, model);
   const outputFormat = oneOf(body.output_format, "output_format", [
     "png",

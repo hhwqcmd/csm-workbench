@@ -735,6 +735,68 @@ test("keeps Seedream generation recoverable without persisting credentials", asy
   assert.doesNotMatch(schema, /api_key|prompt|request_json/i);
 });
 
+test("keeps Seedream coordinate annotations prompt-native and side-effect free", async () => {
+  const source = await readFile(
+    new URL("../app/components/SeedreamWorkbench.tsx", import.meta.url),
+    "utf8",
+  );
+  const server = await readFile(
+    new URL("../app/lib/seedream-server.ts", import.meta.url),
+    "utf8",
+  );
+  const annotationSource = await readFile(
+    new URL("../app/lib/seedream-annotations.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /point \/ bbox 坐标标注/);
+  assert.match(source, /Prompt 是唯一事实源/);
+  assert.match(source, /handleAnnotationPointerDown/);
+  assert.match(source, /Math\.hypot\([\s\S]*?< 4/);
+  assert.match(source, /调整 URL 行顺序会改变 Prompt/);
+  assert.match(source, /Lite 不支持坐标标注/);
+  const annotationHandlers = source.slice(
+    source.indexOf("function handleAnnotationPointerDown"),
+    source.indexOf("function setSequentialMode"),
+  );
+  assert.doesNotMatch(annotationHandlers, /fetch\(/);
+  assert.match(annotationSource, /图\$\{imageNumber\}<point>/);
+  assert.match(annotationSource, /图\$\{imageNumber\}<bbox>/);
+  assert.match(annotationSource, /0–999/);
+  assert.match(server, /validateSeedreamAnnotations/);
+  assert.doesNotMatch(server, /annotations:/);
+});
+
+test("keeps controlled Seedance batches client-side and doubly confirmed", async () => {
+  const source = await readFile(
+    new URL("../app/components/SeedanceTaskRunner.tsx", import.meta.url),
+    "utf8",
+  );
+  const batchSource = await readFile(
+    new URL("../app/lib/seedance-batch.ts", import.meta.url),
+    "utf8",
+  );
+  const pricingSource = await readFile(
+    new URL("../app/lib/seedance-pricing.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /受控批量实验/);
+  assert.match(source, /进入最终费用确认/);
+  assert.match(source, /FINAL COST CONFIRMATION/);
+  assert.match(source, /batchCostConfirmed/);
+  assert.match(source, /batchFinalConfirmed/);
+  assert.match(source, /creationOutcome === "not_created"/);
+  assert.match(source, /创建结果未知，禁止直接重试/);
+  assert.match(source, /\/api\/seedance\/tasks/);
+  assert.match(source, /\/api\/seedance\/tasks\/status/);
+  assert.doesNotMatch(source, /\/api\/seedance\/batch/);
+  assert.match(batchSource, /SEEDANCE_BATCH_MAX_TASKS = 12/);
+  assert.match(batchSource, /SEEDANCE_BATCH_CONCURRENCY = 3/);
+  assert.match(batchSource, /SEEDANCE_BATCH_MAX_RECORDS = 10/);
+  assert.doesNotMatch(batchSource, /apiKey/i);
+  assert.match(pricingSource, /参考估算，不是账单/);
+  assert.match(pricingSource, /checkedAt: "2026-08-04"/);
+});
+
 test("server-renders the editable Managed Agents three-step workbench", async () => {
   const response = await request();
   const html = await response.text();
@@ -1595,6 +1657,7 @@ test("lists every current standard and Agent Plan video model", async () => {
   );
 
   const standardModels = [
+    "doubao-seedance-2-5-260628",
     "doubao-seedance-2-0-260128",
     "doubao-seedance-2-0-fast-260128",
     "doubao-seedance-2-0-mini-260615",
@@ -1668,6 +1731,354 @@ test("creates a task through the server without returning the API key", async ()
   }
 });
 
+test("creates Seedance 2.5 tasks only through the standard API with adaptive and MOV output", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamRequest;
+  globalThis.fetch = async (input, init) => {
+    upstreamRequest = { input: String(input), init };
+    return Response.json({ id: "task-seedance-25", status: "queued" });
+  };
+
+  try {
+    const audioOnly = validSeedance25Input();
+    audioOnly.requestBody.content = [
+      {
+        type: "audio_url",
+        audio_url: { url: "https://example.com/reference.mp3" },
+        role: "reference_audio",
+      },
+    ];
+    audioOnly.requestBody.duration = -1;
+    audioOnly.requestBody.ratio = "adaptive";
+    audioOnly.requestBody.resolution = "720p";
+    audioOnly.requestBody.output_format = "mov";
+
+    const accepted = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(audioOnly),
+    });
+    assert.equal(accepted.status, 201);
+    assert.equal(
+      upstreamRequest.input,
+      "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks",
+    );
+    const upstreamBody = JSON.parse(upstreamRequest.init.body);
+    assert.equal(upstreamBody.model, "doubao-seedance-2-5-260628");
+    assert.equal(upstreamBody.duration, -1);
+    assert.equal(upstreamBody.output_format, "mov");
+    assert.equal(upstreamBody.content.length, 1);
+
+    const planRequest = structuredClone(audioOnly);
+    planRequest.apiPath = "agent-plan";
+    planRequest.baseUrl = "https://ark.cn-beijing.volces.com/api/plan/v3";
+    const rejectedPlan = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(planRequest),
+    });
+    assert.equal(rejectedPlan.status, 400);
+    assert.match(await rejectedPlan.text(), /模型与当前 API 路径不匹配/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("validates and forwards Seedance 2.5 omni reference task types", async () => {
+  const originalFetch = globalThis.fetch;
+  const forwarded = [];
+  globalThis.fetch = async (_input, init) => {
+    forwarded.push(JSON.parse(init.body));
+    return Response.json({ id: `task-omni-${forwarded.length}`, status: "queued" });
+  };
+
+  try {
+    const cases = [
+      {
+        type: "auto",
+        prompt: "参考图片的主体生成电影感镜头",
+        media: {
+          type: "image_url",
+          image_url: { url: "https://example.com/reference.png" },
+          role: "reference_image",
+        },
+        duration: -1,
+      },
+      {
+        type: "reference",
+        prompt: "参考图片的主体生成电影感镜头",
+        media: {
+          type: "image_url",
+          image_url: { url: "https://example.com/reference.png" },
+          role: "reference_image",
+        },
+        duration: 5,
+      },
+      {
+        type: "edit",
+        prompt: "编辑视频：删除背景中的路人",
+        media: {
+          type: "video_url",
+          video_url: { url: "https://example.com/reference.mp4" },
+          role: "reference_video",
+        },
+        duration: -1,
+      },
+      {
+        type: "extend",
+        prompt: "向后延长视频，延续当前运镜",
+        media: {
+          type: "video_url",
+          video_url: { url: "https://example.com/reference.mp4" },
+          role: "reference_video",
+        },
+        duration: 5,
+      },
+    ];
+    for (const item of cases) {
+      const input = validSeedance25Input();
+      input.requestBody.content = [
+        { type: "text", text: item.prompt },
+        item.media,
+      ];
+      input.requestBody.omni_reference_task_type = item.type;
+      input.requestBody.ratio = "adaptive";
+      input.requestBody.duration = item.duration;
+      const response = await request("/api/seedance/tasks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      assert.equal(response.status, 201);
+      assert.equal(forwarded.at(-1).omni_reference_task_type, item.type);
+    }
+
+    const mismatch = validSeedance25Input();
+    mismatch.requestBody.content = [
+      { type: "text", text: "编辑视频：删除背景中的路人" },
+      {
+        type: "video_url",
+        video_url: { url: "https://example.com/reference.mp4" },
+        role: "reference_video",
+      },
+    ];
+    mismatch.requestBody.omni_reference_task_type = "reference";
+    const mismatchResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(mismatch),
+    });
+    assert.equal(mismatchResponse.status, 400);
+    assert.match(await mismatchResponse.text(), /意图不一致/);
+
+    const legacy = validTaskInput();
+    legacy.requestBody.omni_reference_task_type = "auto";
+    const legacyResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(legacy),
+    });
+    assert.equal(legacyResponse.status, 400);
+    assert.match(await legacyResponse.text(), /仅标准 API 的 Seedance 2.5 支持/);
+
+    const unknown = validSeedance25Input();
+    unknown.requestBody.omni_reference_task_type = "guess";
+    const unknownResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(unknown),
+    });
+    assert.equal(unknownResponse.status, 400);
+    const unknownBody = await unknownResponse.json();
+    assert.equal(unknownBody.creationOutcome, "not_created");
+    assert.equal(unknownBody.retryable, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("marks ambiguous Seedance creation failures as unknown and non-retryable", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json(
+      { error: { code: "upstream_busy", message: "try later" } },
+      { status: 503 },
+    );
+  try {
+    const response = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(validTaskInput()),
+    });
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.creationOutcome, "unknown");
+    assert.equal(body.retryable, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("enforces Seedance 2.5 duration, resolution, format, media, and task constraints", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamBody;
+  globalThis.fetch = async (_input, init) => {
+    upstreamBody = JSON.parse(init.body);
+    return Response.json({ id: "task-seedance-25-limits", status: "queued" });
+  };
+
+  try {
+    for (const duration of [-1, 4, 30]) {
+      const input = validSeedance25Input();
+      input.requestBody.duration = duration;
+      const response = await request("/api/seedance/tasks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      assert.equal(response.status, 201);
+    }
+
+    const invalidDuration = validSeedance25Input();
+    invalidDuration.requestBody.duration = 31;
+    const durationResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(invalidDuration),
+    });
+    assert.equal(durationResponse.status, 400);
+    assert.match(await durationResponse.text(), /4 到 30/);
+
+    const legacyDuration = validTaskInput();
+    legacyDuration.requestBody.duration = 16;
+    const legacyDurationResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(legacyDuration),
+    });
+    assert.equal(legacyDurationResponse.status, 400);
+    assert.match(await legacyDurationResponse.text(), /4 到 15/);
+
+    const invalidResolution = validSeedance25Input();
+    invalidResolution.requestBody.resolution = "1080p";
+    const resolutionResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(invalidResolution),
+    });
+    assert.equal(resolutionResponse.status, 400);
+    assert.match(await resolutionResponse.text(), /480p、720p/);
+
+    const legacyMov = validTaskInput();
+    legacyMov.requestBody.output_format = "mov";
+    const legacyMovResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(legacyMov),
+    });
+    assert.equal(legacyMovResponse.status, 400);
+    assert.match(await legacyMovResponse.text(), /output_format 只支持 mp4/);
+
+    const mediaBoundary = validSeedance25Input();
+    mediaBoundary.requestBody.content = [
+      ...Array.from({ length: 30 }, (_, index) => ({
+        type: "image_url",
+        image_url: { url: `https://example.com/image-${index}.png` },
+        role: "reference_image",
+      })),
+      ...Array.from({ length: 10 }, (_, index) => ({
+        type: "video_url",
+        video_url: { url: `https://example.com/video-${index}.mp4` },
+        role: "reference_video",
+      })),
+      ...Array.from({ length: 10 }, (_, index) => ({
+        type: "audio_url",
+        audio_url: { url: `https://example.com/audio-${index}.mp3` },
+        role: "reference_audio",
+      })),
+    ];
+    const boundaryResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(mediaBoundary),
+    });
+    assert.equal(boundaryResponse.status, 201);
+    assert.equal(upstreamBody.content.length, 50);
+
+    mediaBoundary.requestBody.content.push({
+      type: "image_url",
+      image_url: { url: "https://example.com/image-overflow.png" },
+      role: "reference_image",
+    });
+    const overflowResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(mediaBoundary),
+    });
+    assert.equal(overflowResponse.status, 400);
+    assert.match(await overflowResponse.text(), /30 张图片.*总计不超过 50 项/);
+
+    const invalidEdit = validSeedance25Input();
+    invalidEdit.requestBody.content = [
+      { type: "text", text: "编辑视频：删除@视频1中的背景人物" },
+      {
+        type: "video_url",
+        video_url: { url: "https://example.com/edit.mov" },
+        role: "reference_video",
+      },
+    ];
+    invalidEdit.requestBody.ratio = "16:9";
+    invalidEdit.requestBody.duration = 5;
+    const editResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(invalidEdit),
+    });
+    assert.equal(editResponse.status, 400);
+    assert.match(await editResponse.text(), /ratio=adaptive/);
+
+    invalidEdit.requestBody.ratio = "adaptive";
+    const editDurationResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(invalidEdit),
+    });
+    assert.equal(editDurationResponse.status, 400);
+    assert.match(await editDurationResponse.text(), /duration=-1/);
+
+    const singleFrame = validSeedance25Input();
+    singleFrame.requestBody.content = [
+      {
+        type: "image_url",
+        image_url: { url: "https://example.com/first.png" },
+        role: "first_frame",
+      },
+    ];
+    singleFrame.requestBody.ratio = "adaptive";
+    const frameResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(singleFrame),
+    });
+    assert.equal(frameResponse.status, 201);
+
+    singleFrame.requestBody.content.push({
+      type: "video_url",
+      video_url: { url: "https://example.com/reference.mp4" },
+      role: "reference_video",
+    });
+    const mixedFrameResponse = await request("/api/seedance/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(singleFrame),
+    });
+    assert.equal(mixedFrameResponse.status, 400);
+    assert.match(await mixedFrameResponse.text(), /不得混用参考素材/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("polls a task through POST so the API key never enters the URL", async () => {
   const originalFetch = globalThis.fetch;
   const apiKey = "test-agent-key-not-real";
@@ -1681,6 +2092,15 @@ test("polls a task through POST so the API key never enters the URL", async () =
       content: {
         video_url: "https://example.com/result.mp4",
         last_frame_url: "https://example.com/last-frame.jpeg",
+      },
+      duration: 12,
+      ratio: "16:9",
+      resolution: "720p",
+      output_format: "mp4",
+      usage: {
+        completion_tokens: 1234,
+        total_tokens: 1234,
+        tool_usage: { web_search: 1 },
       },
     });
   };
@@ -1703,6 +2123,11 @@ test("polls a task through POST so the API key never enters the URL", async () =
     assert.match(body, /succeeded/);
     assert.match(body, /https:\/\/example\.com\/result\.mp4/);
     assert.match(body, /https:\/\/example\.com\/last-frame\.jpeg/);
+    const payload = JSON.parse(body);
+    assert.equal(payload.duration, 12);
+    assert.equal(payload.outputFormat, "mp4");
+    assert.equal(payload.usage.totalTokens, 1234);
+    assert.equal(payload.usage.webSearch, 1);
     assert.doesNotMatch(body, new RegExp(apiKey));
     assert.equal(
       upstreamRequest.input,
@@ -1712,6 +2137,77 @@ test("polls a task through POST so the API key never enters the URL", async () =
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("preserves cancelled and expired Seedance terminal states and error codes", async () => {
+  const originalFetch = globalThis.fetch;
+  let status = "expired";
+  globalThis.fetch = async () =>
+    Response.json({
+      id: "task-terminal",
+      status,
+      error:
+        status === "expired"
+          ? null
+          : {
+              code: "InvalidParameter.TaskTypeConstraint",
+              message: "ratio must be adaptive",
+            },
+    });
+
+  try {
+    const input = {
+      apiPath: "official",
+      baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+      model: "doubao-seedance-2-5-260628",
+      apiKey: "test-seedance-key-not-real",
+      taskId: "task-terminal",
+    };
+    const expired = await request("/api/seedance/tasks/status", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const expiredPayload = await expired.json();
+    assert.equal(expiredPayload.status, "expired");
+    assert.match(expiredPayload.error, /已过期/);
+
+    status = "cancelled";
+    const cancelled = await request("/api/seedance/tasks/status", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const cancelledPayload = await cancelled.json();
+    assert.equal(cancelledPayload.status, "cancelled");
+    assert.match(
+      cancelledPayload.error,
+      /InvalidParameter\.TaskTypeConstraint.*ratio must be adaptive/,
+    );
+
+    const runnerSource = await readFile(
+      new URL("../app/components/SeedanceTaskRunner.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(runnerSource, /status === "cancelled"/);
+    assert.match(runnerSource, /status === "expired"/);
+    assert.match(runnerSource, /isTerminalTaskStatus\(normalizedStatus\)/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("keeps open, download, and material-save actions for MP4 and MOV results", async () => {
+  const runnerSource = await readFile(
+    new URL("../app/components/SeedanceTaskRunner.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(runnerSource, /在新窗口打开结果视频/);
+  assert.match(runnerSource, /下载结果视频/);
+  assert.match(runnerSource, /download=\{`\$\{selectedExampleTitle\}/);
+  assert.match(runnerSource, /resultOutputFormat \|\| outputFormat/);
+  assert.match(runnerSource, /SaveToMaterialLibraryButton/);
 });
 
 test("enforces official 4K and web-search input constraints", async () => {
@@ -1725,7 +2221,7 @@ test("enforces official 4K and web-search input constraints", async () => {
     body: JSON.stringify(mini4k),
   });
   assert.equal(fourKResponse.status, 400);
-  assert.match(await fourKResponse.text(), /4K 仅支持/);
+  assert.match(await fourKResponse.text(), /resolution 只支持 480p、720p/);
 
   const searchWithMedia = validTaskInput();
   searchWithMedia.requestBody.tools = [{ type: "web_search" }];
@@ -1864,6 +2360,81 @@ test("enforces Seedream model capability and public-image constraints", async ()
   });
   assert.equal(liteFastResponse.status, 400);
   assert.match(await liteFastResponse.text(), /只支持 standard/);
+});
+
+test("accepts only valid Pro prompt-native point and bbox annotations", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamBody;
+  globalThis.fetch = async (_input, init) => {
+    upstreamBody = JSON.parse(init.body);
+    return Response.json({ data: [{ url: "https://example.com/result.png" }] });
+  };
+  try {
+    const valid = validSeedreamInput();
+    valid.image = [
+      "https://example.com/one.png",
+      "https://example.com/two.png",
+    ];
+    valid.prompt =
+      "突出图1主体 图1<point>500 500</point>，修改图2区域 图2<bbox>100 200 900 800</bbox>";
+    const accepted = await request("/api/seedream/generate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        apiKey: "test-seedream-key-not-real",
+        requestBody: valid,
+      }),
+    });
+    assert.equal(accepted.status, 200);
+    assert.equal(upstreamBody.prompt, valid.prompt);
+    assert.equal("annotations" in upstreamBody, false);
+
+    const invalidCases = [
+      {
+        body: { ...valid, model: "doubao-seedream-5-0-lite-260128" },
+        message: /仅 Seedream 5.0 Pro 支持/,
+      },
+      {
+        body: { ...valid, image: "https://example.com/one.png" },
+        message: /不存在的图2/,
+      },
+      {
+        body: {
+          ...valid,
+          prompt: "图1<point>1000 500</point>",
+        },
+        message: /0–999/,
+      },
+      {
+        body: {
+          ...valid,
+          prompt: "图1<bbox>800 800 200 200</bbox>",
+        },
+        message: /x1 < x2/,
+      },
+      {
+        body: {
+          ...valid,
+          prompt: "图1<point>100,200</point>",
+        },
+        message: /格式错误/,
+      },
+    ];
+    for (const invalid of invalidCases) {
+      const response = await request("/api/seedream/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          apiKey: "test-seedream-key-not-real",
+          requestBody: invalid.body,
+        }),
+      });
+      assert.equal(response.status, 400);
+      assert.match(await response.text(), invalid.message);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("relays Seedream streaming events without buffering or exposing the key", async () => {
@@ -3192,6 +3763,28 @@ function validTaskInput() {
       duration: 5,
       generate_audio: true,
       watermark: true,
+    },
+  };
+}
+
+function validSeedance25Input() {
+  return {
+    apiPath: "official",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    model: "doubao-seedance-2-5-260628",
+    apiKey: "test-seedance-key-not-real",
+    requestBody: {
+      model: "doubao-seedance-2-5-260628",
+      content: [
+        {
+          type: "text",
+          text: "电影感城市夜景，镜头平稳向前推进。",
+        },
+      ],
+      ratio: "adaptive",
+      duration: -1,
+      generate_audio: true,
+      watermark: false,
     },
   };
 }
