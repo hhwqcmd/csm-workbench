@@ -119,12 +119,13 @@ test("server-renders the Ark demonstration platform", async () => {
   assert.match(html, /模板资产库/);
   assert.match(html, /Seedance/);
   assert.match(html, /Seedream/);
+  assert.match(html, /Messages API/);
   assert.match(html, /Managed Agents/);
   assert.match(html, /LLM 趋势/);
   assert.match(html, /AI coding/);
   assert.match(html, /顶级栏目/);
   assert.match(html, /全链路 API 演示控制台/);
-  assert.equal((html.match(/data-short-label=/g) ?? []).length, 7);
+  assert.equal((html.match(/data-short-label=/g) ?? []).length, 8);
   assert.ok(
     html.indexOf('data-testid="workspace-templates"') <
       html.indexOf('data-testid="workspace-seedance"'),
@@ -137,8 +138,13 @@ test("server-renders the Ark demonstration platform", async () => {
   );
   assert.ok(
     html.indexOf('data-testid="workspace-responses"') <
+      html.indexOf('data-testid="workspace-anthropic-messages"'),
+    "Messages API should be the fifth top-level studio",
+  );
+  assert.ok(
+    html.indexOf('data-testid="workspace-anthropic-messages"') <
       html.indexOf('data-testid="workspace-managed-agents"'),
-    "Responses API should appear before Managed Agents in the presentation flow",
+    "Messages API should appear before Managed Agents",
   );
   assert.ok(
     html.indexOf('data-testid="workspace-managed-agents"') <
@@ -191,6 +197,11 @@ test("server-renders the Ark demonstration platform", async () => {
   assert.match(html, /完整 API 请求详情/);
   assert.match(html, /完整 API 请求体/);
   assert.match(html, /双向联动/);
+  assert.equal(
+    (html.match(/>复制 cURL<\/button>/g) ?? []).length,
+    4,
+    "Seedance, Seedream, Responses, and Anthropic Messages should render cURL copy buttons",
+  );
   assert.match(html, /执行真实视频生成任务/);
   assert.match(html, /每 30 秒查询一次/);
   assert.match(html, /产生费用/);
@@ -201,7 +212,7 @@ test("server-renders the Ark demonstration platform", async () => {
   assert.doesNotMatch(html, /react-loading-skeleton/);
 });
 
-test("keeps the seven-studio shell compact and anchor-safe across breakpoints", async () => {
+test("keeps the eight-studio shell compact and anchor-safe across breakpoints", async () => {
   const source = await readFile(
     new URL("../app/components/WorkspaceShell.tsx", import.meta.url),
     "utf8",
@@ -223,6 +234,8 @@ test("keeps the seven-studio shell compact and anchor-safe across breakpoints", 
   assert.doesNotMatch(source, /"#flagship-matrix"/);
   assert.match(source, /"#benchmark-lens"/);
   assert.match(source, /"#leaderboards"/);
+  assert.match(source, /"#anthropic-editor"/);
+  assert.match(source, /"#anthropic-schema"/);
   assert.match(styles, /body\s*\{[^}]*overflow-x: clip/s);
   assert.match(
     styles,
@@ -230,7 +243,7 @@ test("keeps the seven-studio shell compact and anchor-safe across breakpoints", 
   );
   assert.match(
     styles,
-    /@media \(max-width: 860px\)[\s\S]*?grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/,
+    /@media \(max-width: 860px\)[\s\S]*?grid-template-columns: repeat\(8, minmax\(0, 1fr\)\)/,
   );
   assert.match(styles, /content: attr\(data-short-label\)/);
 });
@@ -400,6 +413,10 @@ test("server-renders the LLM trends research snapshot without live API work", as
     new URL("../app/components/LlmTrendsWorkbench.tsx", import.meta.url),
     "utf8",
   );
+  const benchmarkModelsSource = source.slice(
+    source.indexOf("const TEXT_MODELS"),
+    source.indexOf("const OPUS_46_REFERENCE"),
+  );
   const leaderboardSource = await readFile(
     new URL("../app/lib/llm-leaderboards.ts", import.meta.url),
     "utf8",
@@ -411,7 +428,7 @@ test("server-renders the LLM trends research snapshot without live API work", as
   const leaderboardRows = JSON.parse(leaderboardJson[1]);
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
-  assert.match(html, /MARKET SNAPSHOT · 2026\.08\.13/);
+  assert.match(html, /MARKET SNAPSHOT · 2026\.08\.25/);
   assert.match(html, /LLM/);
   assert.match(html, /第三方测评/);
   assert.doesNotMatch(html, /文本模型 Benchmark/);
@@ -430,7 +447,9 @@ test("server-renders the LLM trends research snapshot without live API work", as
     "Claude Fable 5",
     "GPT-5.6 Sol",
     "Qwen3.8-Max",
+    "Qwen3.8-27B",
     "Kimi K3",
+    "GLM-5.3",
     "GLM-5.2",
     "DeepSeek-V4-Pro-0813",
     "DeepSeek-V4-Flash-0731",
@@ -510,7 +529,7 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.match(styles, /\.trend-model-comparison-table\s*\{[^}]*min-width: 1080px/s);
   for (const benchmark of [
     "NL2Repo-Bench",
-    "SciCode",
+    "Terminal-Bench 3.0",
     "Terminal-Bench 2.1",
     "SWE Pro",
     "Agents’ Last Exam (ALE)",
@@ -523,25 +542,48 @@ test("server-renders the LLM trends research snapshot without live API work", as
   }
   assert.doesNotMatch(source, /id: "gdpval"/);
   assert.doesNotMatch(source, /label: "GDPval"/);
+  assert.doesNotMatch(source, /id: "sciCode"/);
+  assert.doesNotMatch(source, /label: "SciCode"/);
+  assert.match(source, /id: "terminal3"/);
   assert.match(source, /id: "deepSwe"/);
   assert.match(source, /113 项长程软件工程任务；3 次运行平均 pass@1/);
   assert.match(source, /value: "72\.7%"[\s\S]*?OpenAI 官方发布 · DeepSWE v1\.1 \/ max/);
-  assert.match(source, /value: "66\.0%"[\s\S]*?AA v1\.3 · Claude Code \/ max \+ fallback/);
+  assert.match(source, /value: "69\.7%"[\s\S]*?Anthropic 系统卡 · DeepSWE v1\.1 \/ max/);
   assert.match(source, /value: "67\.5%"[\s\S]*?Kimi 官方模型卡 · Kimi Code \/ max/);
-  assert.match(source, /value: "46\.2%"[\s\S]*?GLM 官方模型卡 · mini-swe-agent/);
+  assert.match(benchmarkModelsSource, /model: "Claude Opus 5"/);
+  assert.match(benchmarkModelsSource, /model: "Qwen3\.8-27B"/);
+  assert.doesNotMatch(benchmarkModelsSource, /model: "GLM-5\.2"/);
+  assert.doesNotMatch(benchmarkModelsSource, /model: "MiniMax M3"/);
   assert.match(source, /model: "DeepSeek-V4-Flash-0731"[\s\S]*?value: "54\.2%"[\s\S]*?DeepSeek Harness 极简模式 \/ max/);
   assert.match(source, /value: "82\.7%"[\s\S]*?DeepSeek 官方 · DeepSeek Harness 极简模式 \/ max/);
   assert.match(source, /value: "25\.2%"[\s\S]*?Agent Last Exam \/ Agent 框架未单独披露/);
   assert.match(source, /value: "54\.4%"[\s\S]*?DeepSeek 官方 · DeepSeek Harness 极简模式 \/ max/);
   assert.match(source, /model: "DeepSeek-V4-Flash-0731"[\s\S]*?price: "¥1 \/ ¥2"/);
   assert.match(
-    source,
-    /model: "DeepSeek-V4-Pro-0813"[\s\S]*?price: "¥3 \/ ¥6"[\s\S]*?value: "49\.2%"[\s\S]*?Artificial Analysis · SciCode \/ max[\s\S]*?value: "78\.7%"[\s\S]*?Terminal-Bench 2\.1 \/ max[\s\S]*?value: "8\.6%"[\s\S]*?AA v1\.3 · Claude Code \/ high/,
+    benchmarkModelsSource,
+    /model: "DeepSeek-V4-Pro-0813"[\s\S]*?price: "¥3 \/ ¥6"[\s\S]*?value: "61\.5%"[\s\S]*?DeepSeek Harness \/ max[\s\S]*?Terminal-Bench 3\.0 官方榜未收录 DeepSeek-V4-Pro-0813[\s\S]*?value: "25\.7%"[\s\S]*?value: "87\.9%"[\s\S]*?value: "62\.7%"[\s\S]*?DeepSWE 1\.1 \/ DeepSeek Harness \/ max/,
   );
   assert.match(
     source,
-    /model: "Grok 4\.6"[\s\S]*?price: "\$2 \/ \$6"[\s\S]*?value: "53\.6%"[\s\S]*?Artificial Analysis · SciCode \/ high[\s\S]*?value: "88\.4%"[\s\S]*?Terminal-Bench 2\.1 \/ high[\s\S]*?value: "65\.9%"[\s\S]*?SpaceXAI 官方 · DeepSWE v1\.1 \/ high/,
+    /model: "Grok 4\.6"[\s\S]*?price: "\$2 \/ \$6"[\s\S]*?value: "26\.5%"[\s\S]*?Terminal-Bench 3\.0 官方榜 · Grok Build \/ high[\s\S]*?value: "88\.4%"[\s\S]*?Terminal-Bench 2\.1 \/ high[\s\S]*?value: "65\.9%"[\s\S]*?SpaceXAI 官方 · DeepSWE v1\.1 \/ high/,
   );
+  assert.match(
+    source,
+    /model: "GLM-5\.3"[\s\S]*?price: "未披露"[\s\S]*?value: "58\.0%"[\s\S]*?GLM 官方发布 · 1M context[\s\S]*?value: "28\.3%"[\s\S]*?Claude Code 2\.1\.207 \/ max \/ avg@3[\s\S]*?value: "88\.2%"[\s\S]*?Claude Code 2\.1\.207 \/ max[\s\S]*?value: "28\.5%"[\s\S]*?ALE-CLI \/ Claude Code \/ max[\s\S]*?value: "66\.9%"[\s\S]*?DeepSWE v1\.1 \/ mini-swe-agent/,
+  );
+  assert.match(source, /model: "Kimi K3"[\s\S]*?value: "17\.4%"[\s\S]*?GLM 官方发布交叉表 · Claude Code \/ max/);
+  assert.match(source, /model: "GPT-5\.6 Sol"[\s\S]*?value: "34\.6%"[\s\S]*?Terminal-Bench 3\.0 官方榜 · Codex \/ max/);
+  assert.match(source, /model: "Claude Fable 5"[\s\S]*?value: "34\.1%"[\s\S]*?Terminal-Bench 3\.0 官方榜 · Claude Code \/ max/);
+  assert.match(
+    benchmarkModelsSource,
+    /model: "Claude Opus 5"[\s\S]*?value: "42\.7%"[\s\S]*?mini-SWE-agent \/ max[\s\S]*?value: "27\.0%"[\s\S]*?Claude Code \/ max[\s\S]*?value: "89\.1%"[\s\S]*?Terminal-Bench 2\.1 \/ max[\s\S]*?value: "85\.8%"[\s\S]*?value: "79\.2%"[\s\S]*?adaptive thinking \/ max[\s\S]*?value: "68\.8%"[\s\S]*?DeepSWE v1\.1 \/ max[\s\S]*?value: "70\.6%"[\s\S]*?OSWorld 2\.0 \/ max/,
+  );
+  assert.match(
+    benchmarkModelsSource,
+    /model: "Qwen3\.8-27B"[\s\S]*?parameters: "27B"[\s\S]*?value: "42\.3%"[\s\S]*?Qwen 官方模型卡 · Claude Code[\s\S]*?value: "20\.4%"[\s\S]*?Claude Code \/ max[\s\S]*?value: "73\.0%"[\s\S]*?Qwen 官方模型卡 · Terminus[\s\S]*?value: "61\.7%"[\s\S]*?Claude Code \/ 256K[\s\S]*?value: "42\.2%"[\s\S]*?DeepSWE 1\.1 \/ Claude Code \/ 256K[\s\S]*?value: "84\.3%"[\s\S]*?OSWorld-Verified/,
+  );
+  assert.match(benchmarkModelsSource, /model: "Doubao-Seed-2\.1-Pro"[\s\S]*?value: "19\.1%"[\s\S]*?ALE 官方榜 · Claude Code/);
+  assert.match(benchmarkModelsSource, /model: "GPT-5\.6 Sol"[\s\S]*?value: "30\.6%"[\s\S]*?ALE 官方榜 · Codex \/ xhigh/);
   assert.match(source, /model: "Qwen3\.8-Max"[\s\S]*?parameters: "2\.4T \/ 95B 激活"/);
   assert.match(source, /value: "86\.6%"[\s\S]*?Qwen 官方 · Claude Code \/ avg@10/);
   assert.match(source, /value: "67\.7%"[\s\S]*?Qwen 官方 · Claude Code/);
@@ -550,8 +592,8 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.match(source, /value: "27\.0%"[\s\S]*?Qwen 官方 · Pass \/ Agent 框架未披露/);
   assert.match(source, /value: "86\.1%"[\s\S]*?Qwen 官方 · OSWorld-Verified \/ 框架未披露/);
   assert.match(source, /value: "82\.3%"[\s\S]*?Qwen 官方 · 内部评估 \/ 无 Agent 框架/);
-  assert.match(source, /Qwen 官方未发布 SciCode \/ Agent 框架/);
-  assert.match(source, /DeepSeek 官方未发布 SciCode 同名结果/);
+  assert.match(source, /Qwen 官方与 Terminal-Bench 3\.0 官方榜未发布同名结果/);
+  assert.match(source, /Terminal-Bench 3\.0 官方榜未收录 DeepSeek-V4-Flash-0731/);
   assert.match(source, /board\.rows\.slice\(0, 50\)/);
   assert.match(source, /各取前 50，不足则全量/);
   for (const board of [
@@ -560,20 +602,26 @@ test("server-renders the LLM trends research snapshot without live API work", as
     "WebDev Arena",
     "Vision Arena",
     "Text-to-Image",
-    "Intelligence Index v4.1",
-    "Agentic Index",
-    "AA-Briefcase",
   ]) {
     assert.equal(leaderboardRows[board].length, 50, `${board} should store 50 rows`);
   }
-  assert.equal(leaderboardRows["Text-to-Video"].length, 44);
-  assert.equal(leaderboardRows["Coding Agent Index"].length, 45);
-  assert.equal(leaderboardRows["Text / Overall"][42].model, "grok-4.6-high");
-  assert.equal(leaderboardRows["Text / Overall"][49].model, "deepseek-v4-pro");
-  assert.equal(leaderboardRows["Intelligence Index v4.1"][22].model, "DeepSeek V4 Pro 0813 (max)");
-  assert.equal(leaderboardRows["Intelligence Index v4.1"][28].model, "DeepSeek V4 Flash 0731 (max)");
-  assert.equal(leaderboardRows["Agentic Index"][1].model, "Grok 4.6 (high)");
-  assert.equal(leaderboardRows["Agentic Index"][13].model, "DeepSeek V4 Pro 0813 (max)");
+  assert.equal(leaderboardRows["Text-to-Video"].length, 45);
+  assert.equal(leaderboardRows["Intelligence Index v4.1.1"].length, 28);
+  assert.equal(leaderboardRows["Coding Agent Index"].length, 50);
+  assert.equal(leaderboardRows["Agentic Index"].length, 28);
+  assert.equal(leaderboardRows["AA-Briefcase"].length, 19);
+  assert.equal(leaderboardRows["Text / Overall"][45].model, "grok-4.6-high");
+  assert.equal(leaderboardRows["Text / Overall"][49].model, "deepseek-v4-pro-high-20260813");
+  assert.equal(leaderboardRows["Text-to-Video"][2].model, "dreamina-seedance-2.0-720p");
+  assert.equal(leaderboardRows["Text-to-Video"][3].model, "dreamina-seedance-2.5-720p");
+  assert.equal(leaderboardRows["Intelligence Index v4.1.1"][3].model, "Grok 4.6 (high)");
+  assert.equal(leaderboardRows["Intelligence Index v4.1.1"][5].model, "GLM-5.3 (max)");
+  assert.equal(leaderboardRows["Intelligence Index v4.1.1"][10].model, "DeepSeek V4 Pro 0813 (max)");
+  assert.equal(leaderboardRows["Coding Agent Index"][33].model, "Codex - DeepSeek V4 Flash 0731 (max)");
+  assert.equal(leaderboardRows["Coding Agent Index"][41].model, "Codex - DeepSeek V4 Pro 0813 (max)");
+  assert.equal(leaderboardRows["Agentic Index"][1].model, "GLM-5.3 (max)");
+  assert.equal(leaderboardRows["Agentic Index"][2].model, "Grok 4.6 (high)");
+  assert.equal(leaderboardRows["Agentic Index"][9].model, "DeepSeek V4 Pro 0813 (max)");
   assert.match(source, /Qwen 官方未发布 MCP-Atlas \/ Agent 框架/);
   assert.doesNotMatch(source, /label: "AA Coding Agent Index"/);
   assert.match(source, /model: "Claude Opus 4\.6"/);
@@ -583,7 +631,7 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.doesNotMatch(source, /featured: true/);
   assert.match(source, /useState<BenchmarkKey>\("ale"\)/);
   assert.match(html, /Long-Horizon/);
-  assert.match(html, /本次检索未找到同口径公开值/);
+  assert.match(html, /xAI 与 AA 未发布 Grok 4\.6 的 ALE 同名结果/);
   assert.match(source, /https:\/\/qwen\.ai\/blog\?id=qwen3\.8/);
   assert.doesNotMatch(source, /model: "Qwen3\.7-Max"/);
   assert.match(source, /https:\/\/llm-stats\.com\/benchmarks\/swe-bench-pro/);
@@ -593,7 +641,7 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.match(styles, /\.trends-score-row\.is-reference\s*\{/);
   assert.match(styles, /\.trends-score-row\.is-na:not\(\.is-reference\)\s*\{/);
   assert.match(html, /LMArena/);
-  assert.match(html, /Intelligence Index v4\.1/);
+  assert.match(html, /Intelligence Index v4\.1\.1/);
   assert.match(html, /Coding Agent Index/);
   assert.match(html, /Agentic Index/);
   assert.match(html, /AA-Briefcase/);
@@ -606,6 +654,8 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.match(html, /科学推理/);
   assert.match(html, /通用能力/);
   assert.match(html, /9 项基准按 4 类不等权合成/);
+  assert.match(source, /2026-08-25 · v1\.4 · model \+ harness/);
+  assert.match(source, /89 项 Agent 终端任务/);
   for (const board of [
     "Text / Overall",
     "Coding Arena",
@@ -3729,6 +3779,257 @@ test("rejects unsafe or incompatible Responses API payloads before upstream call
   });
   assert.equal(invalidId.status, 400);
   assert.match(await invalidId.text(), /resp_/);
+});
+
+test("server-renders the editable Messages API studio and Anthropic protocol boundary", async () => {
+  const response = await request();
+  const html = await response.text();
+  const source = await readFile(
+    new URL("../app/components/AnthropicMessagesWorkbench.tsx", import.meta.url),
+    "utf8",
+  );
+  const server = await readFile(
+    new URL("../app/lib/anthropic-messages-server.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(html, /ARK \/ ANTHROPIC COMPATIBLE/);
+  assert.match(html, />Messages API</);
+  assert.doesNotMatch(html, />Anthropic Messages API</);
+  assert.match(html, /REQUEST CONTRACT/);
+  assert.match(html, /id="anthropic-messages"/);
+  assert.match(html, /id="anthropic-editor"/);
+  assert.match(html, /id="anthropic-schema"/);
+  assert.equal(
+    (html.match(/data-testid="anthropic-scenario-/g) ?? []).length,
+    8,
+  );
+  for (const title of [
+    "基础文本与 System",
+    "无状态多轮",
+    "Assistant Prefill",
+    "深度思考与 Signature",
+    "多模态图片 / 文档",
+    "Tool Use",
+    "tool_result 回传",
+    "Prompt Caching",
+  ]) {
+    assert.match(html, new RegExp(title));
+  }
+  for (const field of [
+    "max_tokens",
+    "messages",
+    "system",
+    "thinking",
+    "signature",
+    "tool_choice",
+    "cache_control",
+    "metadata",
+    "stop_sequences",
+    "input_json_delta",
+  ]) {
+    assert.match(html, new RegExp(field));
+  }
+  for (const nativeField of [
+    "output_config",
+    "container / skills",
+    "Anthropic Server Tools",
+    "inference_geo",
+  ]) {
+    assert.match(html, new RegExp(nativeField));
+  }
+  assert.match(html, /方舟兼容性待验证/);
+  assert.match(html, /仅创建 Message/);
+  assert.match(html, /最近 30 次 Messages 调用/);
+  assert.match(source, /fetch\("\/api\/anthropic-messages"/);
+  assert.match(source, /anthropic-messages-workbench:history:v1/);
+  assert.match(source, /seedance-workbench:demo-credentials:v1/);
+  assert.match(source, /compactForStorage/);
+  assert.match(source, /生成下一轮 tool_result 模板/);
+  assert.match(source, /consumeAnthropicMessagesStream/);
+  assert.match(server, /anthropic-version/);
+  assert.match(server, /REQUEST_BODY_FIELDS/);
+  assert.match(server, /redactAnthropicMessagesStream/);
+  assert.doesNotMatch(server, /baseUrl/);
+});
+
+test("proxies fixed-header sync and cross-chunk SSE Anthropic Messages requests", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  const apiKey = "test-anthropic-key-not-real";
+
+  globalThis.fetch = async (input, init) => {
+    calls.push({ url: String(input), init });
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    if (body.stream) {
+      const encoder = new TextEncoder();
+      const payload = [
+        'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_stream_123","type":"message","role":"assistant","content":[],"model":"doubao-seed-2-1-pro-260628","usage":{"input_tokens":12}}}',
+        'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+        `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"${apiKey}"}}`,
+        'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}',
+        'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":8,"cache_read_input_tokens":4}}',
+        'event: message_stop\ndata: {"type":"message_stop"}',
+        "",
+      ].join("\n\n");
+      const keyStart = payload.indexOf(apiKey);
+      const splitAt = keyStart + Math.floor(apiKey.length / 2);
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode(payload.slice(0, splitAt)));
+            controller.enqueue(encoder.encode(payload.slice(splitAt)));
+            controller.close();
+          },
+        }),
+        { headers: { "content-type": "text/event-stream", "x-request-id": "req-stream-123" } },
+      );
+    }
+    return Response.json({
+      id: "msg_sync_123",
+      type: "message",
+      role: "assistant",
+      content: [{ type: "text", text: apiKey }],
+      authorization: `Bearer ${apiKey}`,
+      usage: { input_tokens: 3, output_tokens: 5 },
+    });
+  };
+
+  try {
+    const syncResponse = await request("/api/anthropic-messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        apiKey,
+        trace: true,
+        requestBody: {
+          model: "doubao-seed-2-1-pro-260628",
+          max_tokens: 1024,
+          messages: [{ role: "user", content: "hello" }],
+          stream: false,
+        },
+      }),
+    });
+    assert.equal(syncResponse.status, 200);
+    const syncText = await syncResponse.text();
+    assert.match(syncText, /msg_sync_123/);
+    assert.match(syncText, /\[REDACTED\]/);
+    assert.doesNotMatch(syncText, new RegExp(apiKey));
+    assert.equal(
+      calls[0].url,
+      "https://ark.cn-beijing.volces.com/api/compatible/v1/messages",
+    );
+    assert.equal(calls[0].init.method, "POST");
+    assert.equal(calls[0].init.headers.authorization, `Bearer ${apiKey}`);
+    assert.equal(calls[0].init.headers["content-type"], "application/json");
+    assert.equal(calls[0].init.headers["anthropic-version"], "2023-06-01");
+    assert.equal(calls[0].init.headers["x-fornax-trace"], "true");
+
+    const streamResponse = await request("/api/anthropic-messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        apiKey,
+        trace: false,
+        requestBody: {
+          model: "doubao-seed-2-1-pro-260628",
+          max_tokens: 4096,
+          messages: [{ role: "user", content: "think in a stream" }],
+          thinking: { type: "enabled", budget_tokens: 2048 },
+          stream: true,
+        },
+      }),
+    });
+    assert.equal(streamResponse.status, 200);
+    assert.match(streamResponse.headers.get("content-type") ?? "", /text\/event-stream/);
+    assert.equal(streamResponse.headers.get("x-request-id"), "req-stream-123");
+    const streamText = await streamResponse.text();
+    assert.match(streamText, /message_start/);
+    assert.match(streamText, /message_stop/);
+    assert.match(streamText, /\[REDACTED\]/);
+    assert.doesNotMatch(streamText, new RegExp(apiKey));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("rejects unsafe or incompatible Anthropic Messages payloads before upstream calls", async () => {
+  const apiKey = "test-anthropic-key-not-real";
+  async function invalid(requestBody, extra = {}) {
+    return request("/api/anthropic-messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ apiKey, trace: false, requestBody, ...extra }),
+    });
+  }
+  const base = {
+    model: "doubao-seed-2-1-pro-260628",
+    max_tokens: 2048,
+    messages: [{ role: "user", content: "hello" }],
+  };
+
+  for (const [payload, pattern] of [
+    [{ ...base, base_url: "https://evil.example" }, /未支持字段/],
+    [{ ...base, output_config: { format: "json" } }, /未支持字段/],
+    [
+      { ...base, messages: [{ role: "system", content: "unsafe" }] },
+      /system 必须使用顶层字段/,
+    ],
+    [
+      {
+        ...base,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "url", url: "https://127.0.0.1/private.png" } },
+            ],
+          },
+        ],
+      },
+      /公网 HTTPS 主机/,
+    ],
+    [
+      {
+        ...base,
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "tool_result", tool_use_id: "toolu_missing", content: "{}" }],
+          },
+        ],
+      },
+      /引用前序/,
+    ],
+    [
+      { ...base, thinking: { type: "enabled", budget_tokens: 2048 } },
+      /必须小于 max_tokens/,
+    ],
+    [
+      {
+        ...base,
+        messages: [
+          {
+            role: "assistant",
+            content: [{ type: "thinking", thinking: "reason without signature" }],
+          },
+        ],
+      },
+      /signature/,
+    ],
+    [{ ...base, cache_control: { type: "ephemeral", ttl: "24h" } }, /5m 或 1h/],
+  ]) {
+    const response = await invalid(payload);
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), pattern);
+  }
+
+  const arbitraryEnvelope = await invalid(base, {
+    baseUrl: "https://evil.example/v1/messages",
+    anthropicVersion: "2099-01-01",
+  });
+  assert.equal(arbitraryEnvelope.status, 400);
+  assert.match(await arbitraryEnvelope.text(), /请求包.*包含未支持字段/);
 });
 
 function validTaskInput() {

@@ -5,7 +5,7 @@ import { CURRENT_LEADERBOARD_ROWS } from "../lib/llm-leaderboards";
 
 type BenchmarkKey =
   | "nl2Repo"
-  | "sciCode"
+  | "terminal3"
   | "terminal"
   | "swePro"
   | "ale"
@@ -101,10 +101,10 @@ const BENCHMARKS: Array<{
     lens: "从自然语言需求生成完整代码仓库。",
   },
   {
-    id: "sciCode",
-    short: "SCI CODE",
-    label: "SciCode",
-    lens: "科研场景中的代码生成与问题求解。",
+    id: "terminal3",
+    short: "TERMINAL 3.0",
+    label: "Terminal-Bench 3.0",
+    lens: "更高难度、长时限的真实终端与软件工程任务。",
   },
   {
     id: "terminal",
@@ -168,15 +168,13 @@ const TEXT_MODELS: TextModel[] = [
         source: "Seed 2.1 发布数据",
         href: "https://www.volcengine.com/product/doubao",
       },
-      sciCode: {
-        value: "59.8%",
-        score: 59.8,
-        source: "Seed 2.1 发布数据",
-        href: "https://www.volcengine.com/product/doubao",
-      },
+      terminal3: NA(
+        "https://www.volcengine.com/product/doubao",
+        "火山官方未发布 Terminal-Bench 3.0 同名结果",
+      ),
       ale: {
-        value: "19.5%",
-        score: 19.5,
+        value: "19.1%",
+        score: 19.1,
         source: "ALE 官方榜 · Claude Code",
         href: "https://agents-last-exam.org/leaderboard",
       },
@@ -228,11 +226,11 @@ const TEXT_MODELS: TextModel[] = [
     officialUrl: "https://www.anthropic.com/claude/fable",
     metrics: {
       nl2Repo: NA("https://www.anthropic.com/claude/fable"),
-      sciCode: {
-        value: "60.2%",
-        score: 60.2,
-        source: "Kimi 官方模型卡交叉表",
-        href: "https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md",
+      terminal3: {
+        value: "34.1%",
+        score: 34.1,
+        source: "Terminal-Bench 3.0 官方榜 · Claude Code / max",
+        href: "https://www.frontierbench.ai/",
       },
       ale: {
         value: "25.7%",
@@ -259,10 +257,10 @@ const TEXT_MODELS: TextModel[] = [
         href: "https://llm-stats.com/benchmarks/swe-bench-pro",
       },
       deepSwe: {
-        value: "66.0%",
-        score: 66,
-        source: "AA v1.3 · Claude Code / max + fallback",
-        href: "https://artificialanalysis.ai/agents/coding-agents/comparisons/claude-code-vs-kimi-code-cli",
+        value: "69.7%",
+        score: 69.7,
+        source: "Anthropic 系统卡 · DeepSWE v1.1 / max",
+        href: "https://www-cdn.anthropic.com/c5fbac3f0b1280a933ebd26d3cb8bb9f5bdeaf48/Claude%20Opus%205%20System%20Card.pdf",
       },
       osWorld: {
         value: "85.0%",
@@ -279,6 +277,69 @@ const TEXT_MODELS: TextModel[] = [
     },
   },
   {
+    vendor: "Anthropic",
+    model: "Claude Opus 5",
+    release: "2026.07.24",
+    access: "闭源 API",
+    price: "$5 / $25",
+    priceNote: "全球 API 输入 / 输出",
+    context: "1M",
+    parameters: "未披露",
+    officialUrl: "https://www.anthropic.com/news/claude-opus-5",
+    metrics: {
+      nl2Repo: NA(
+        "https://www.anthropic.com/news/claude-opus-5",
+        "Anthropic 与当前独立榜未发布 Opus 5 的 NL2Repo 同名结果",
+      ),
+      terminal3: {
+        value: "42.7%",
+        score: 42.7,
+        source: "Terminal-Bench 3.0 官方榜 · mini-SWE-agent / max",
+        href: "https://www.frontierbench.ai/",
+      },
+      ale: {
+        value: "27.0%",
+        score: 27,
+        source: "ALE 官方榜 · Claude Code / max",
+        href: "https://agents-last-exam.org/leaderboard",
+      },
+      terminal: {
+        value: "89.1%",
+        score: 89.1,
+        source: "Artificial Analysis · Terminal-Bench 2.1 / max",
+        href: "https://artificialanalysis.ai/models/claude-opus-5",
+      },
+      mcpAtlas: {
+        value: "85.8%",
+        score: 85.8,
+        source: "Anthropic 系统卡 · max",
+        href: "https://www-cdn.anthropic.com/c5fbac3f0b1280a933ebd26d3cb8bb9f5bdeaf48/Claude%20Opus%205%20System%20Card.pdf",
+      },
+      swePro: {
+        value: "79.2%",
+        score: 79.2,
+        source: "Anthropic 系统卡 · adaptive thinking / max",
+        href: "https://www-cdn.anthropic.com/c5fbac3f0b1280a933ebd26d3cb8bb9f5bdeaf48/Claude%20Opus%205%20System%20Card.pdf",
+      },
+      deepSwe: {
+        value: "68.8%",
+        score: 68.8,
+        source: "Anthropic 系统卡 · DeepSWE v1.1 / max",
+        href: "https://www-cdn.anthropic.com/c5fbac3f0b1280a933ebd26d3cb8bb9f5bdeaf48/Claude%20Opus%205%20System%20Card.pdf",
+      },
+      osWorld: {
+        value: "70.6%",
+        score: 70.6,
+        source: "Anthropic 系统卡 · OSWorld 2.0 / max",
+        href: "https://www-cdn.anthropic.com/c5fbac3f0b1280a933ebd26d3cb8bb9f5bdeaf48/Claude%20Opus%205%20System%20Card.pdf",
+      },
+      mmmuPro: NA(
+        "https://www.anthropic.com/news/claude-opus-5",
+        "Anthropic 系统卡未发布 Opus 5 的 MMMU-Pro 结果",
+      ),
+    },
+  },
+  {
     vendor: "OpenAI",
     model: "GPT-5.6 Sol",
     release: "2026.07",
@@ -290,17 +351,17 @@ const TEXT_MODELS: TextModel[] = [
     officialUrl: "https://openai.com/index/gpt-5-6/",
     metrics: {
       nl2Repo: NA("https://openai.com/index/gpt-5-6/"),
-      sciCode: {
-        value: "56.1%",
-        score: 56.1,
-        source: "Kimi 官方模型卡交叉表",
-        href: "https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md",
+      terminal3: {
+        value: "34.6%",
+        score: 34.6,
+        source: "Terminal-Bench 3.0 官方榜 · Codex / max",
+        href: "https://www.frontierbench.ai/",
       },
       ale: {
-        value: "29.6%",
-        score: 29.6,
-        source: "Kimi 官方模型卡 · ALE / Codex",
-        href: "https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md",
+        value: "30.6%",
+        score: 30.6,
+        source: "ALE 官方榜 · Codex / xhigh",
+        href: "https://agents-last-exam.org/leaderboard",
       },
       terminal: {
         value: "88.8%",
@@ -357,9 +418,9 @@ const TEXT_MODELS: TextModel[] = [
         source: "Qwen 官方 · Claude Code",
         href: "https://qwen.ai/blog?id=qwen3.8",
       },
-      sciCode: NA(
+      terminal3: NA(
         "https://qwen.ai/blog?id=qwen3.8",
-        "Qwen 官方未发布 SciCode / Agent 框架",
+        "Qwen 官方与 Terminal-Bench 3.0 官方榜未发布同名结果",
       ),
       ale: {
         value: "27.0%",
@@ -404,6 +465,67 @@ const TEXT_MODELS: TextModel[] = [
     },
   },
   {
+    vendor: "阿里云",
+    model: "Qwen3.8-27B",
+    release: "2026.08.14",
+    access: "开放权重 / API",
+    price: "¥3 / ¥12",
+    priceNote: "中国区华北 2 输入 / 输出",
+    context: "1M",
+    parameters: "27B",
+    officialUrl: "https://help.aliyun.com/zh/model-studio/qwen3-8-27b",
+    metrics: {
+      nl2Repo: {
+        value: "42.3%",
+        score: 42.3,
+        source: "Qwen 官方模型卡 · Claude Code",
+        href: "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/README.md",
+      },
+      terminal3: NA(
+        "https://www.frontierbench.ai/",
+        "Qwen 官方与 Terminal-Bench 3.0 官方榜未发布同名结果",
+      ),
+      ale: {
+        value: "20.4%",
+        score: 20.4,
+        source: "Qwen 官方模型卡 · Claude Code / max",
+        href: "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/README.md",
+      },
+      terminal: {
+        value: "73.0%",
+        score: 73,
+        source: "Qwen 官方模型卡 · Terminus",
+        href: "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/README.md",
+      },
+      mcpAtlas: NA(
+        "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/README.md",
+        "Qwen 官方模型卡未发布 MCP-Atlas 同名结果",
+      ),
+      swePro: {
+        value: "61.7%",
+        score: 61.7,
+        source: "Qwen 官方模型卡 · Claude Code / 256K",
+        href: "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/README.md",
+      },
+      deepSwe: {
+        value: "42.2%",
+        score: 42.2,
+        source: "Qwen 官方模型卡 · DeepSWE 1.1 / Claude Code / 256K",
+        href: "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/README.md",
+      },
+      osWorld: {
+        value: "84.3%",
+        score: 84.3,
+        source: "Qwen 官方模型卡 · OSWorld-Verified",
+        href: "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/README.md",
+      },
+      mmmuPro: NA(
+        "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/README.md",
+        "Qwen 官方模型卡未发布 MMMU-Pro 结果",
+      ),
+    },
+  },
+  {
     vendor: "月之暗面",
     model: "Kimi K3",
     release: "2026.07",
@@ -415,11 +537,11 @@ const TEXT_MODELS: TextModel[] = [
     officialUrl: "https://www.kimi.com/zh-cn/resources/kimi-k3-pricing",
     metrics: {
       nl2Repo: NA("https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md"),
-      sciCode: {
-        value: "58.7%",
-        score: 58.7,
-        source: "Kimi 官方模型卡",
-        href: "https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md",
+      terminal3: {
+        value: "17.4%",
+        score: 17.4,
+        source: "GLM 官方发布交叉表 · Claude Code / max",
+        href: "https://z.ai/blog/glm-5.3",
       },
       ale: {
         value: "28.3%",
@@ -467,59 +589,61 @@ const TEXT_MODELS: TextModel[] = [
   },
   {
     vendor: "智谱",
-    model: "GLM-5.2",
-    release: "2026.06",
-    access: "开放权重 / API",
-    price: "¥8 / ¥28",
-    priceNote: "中国区标准输入 / 输出",
-    context: "1M",
-    parameters: "753B",
-    officialUrl: "https://bigmodel.cn/pricing",
+    model: "GLM-5.3",
+    release: "2026.08.14",
+    access: "API / 权重两周后开放",
+    price: "未披露",
+    priceNote: "官方发布页未披露 API 按量价格",
+    context: "1M（评测口径）",
+    parameters: "同 GLM-5.2 底座",
+    officialUrl: "https://z.ai/blog/glm-5.3",
     metrics: {
       nl2Repo: {
-        value: "48.9%",
-        score: 48.9,
-        source: "GLM 官方发布",
-        href: "https://z.ai/blog/glm-5.2",
+        value: "58.0%",
+        score: 58,
+        source: "GLM 官方发布 · 1M context",
+        href: "https://z.ai/blog/glm-5.3",
       },
-      sciCode: {
-        value: "50.5%",
-        score: 50.5,
-        source: "Kimi 官方模型卡交叉表",
-        href: "https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md",
-      },
-      ale: {
-        value: "20.4%",
-        score: 20.4,
-        source: "ALE 官方榜 · Claude Code",
-        href: "https://agents-last-exam.org/leaderboard",
+      terminal3: {
+        value: "28.3%",
+        score: 28.3,
+        source: "GLM 官方发布 · Claude Code 2.1.207 / max / avg@3",
+        href: "https://z.ai/blog/glm-5.3",
       },
       terminal: {
-        value: "82.7%",
-        score: 82.7,
-        source: "GLM / Kimi 官方模型卡",
-        href: "https://huggingface.co/zai-org/GLM-5.2",
+        value: "88.2%",
+        score: 88.2,
+        source: "GLM 官方发布 · Claude Code 2.1.207 / max",
+        href: "https://z.ai/blog/glm-5.3",
       },
-      mcpAtlas: {
-        value: "82.6%",
-        score: 82.6,
-        source: "官方模型卡交叉表",
-        href: "https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md",
+      swePro: NA(
+        "https://z.ai/blog/glm-5.3",
+        "GLM 官方未发布 SWE Pro 同名结果",
+      ),
+      ale: {
+        value: "28.5%",
+        score: 28.5,
+        source: "GLM 官方发布 · ALE-CLI / Claude Code / max",
+        href: "https://z.ai/blog/glm-5.3",
       },
-      swePro: {
-        value: "62.1%",
-        score: 62.1,
-        source: "GLM 官方模型卡",
-        href: "https://huggingface.co/zai-org/GLM-5.2",
-      },
+      mcpAtlas: NA(
+        "https://z.ai/blog/glm-5.3",
+        "GLM 官方未发布 MCP-Atlas 同名结果",
+      ),
       deepSwe: {
-        value: "46.2%",
-        score: 46.2,
-        source: "GLM 官方模型卡 · mini-swe-agent",
-        href: "https://huggingface.co/zai-org/GLM-5.2",
+        value: "66.9%",
+        score: 66.9,
+        source: "GLM 官方发布 · DeepSWE v1.1 / mini-swe-agent",
+        href: "https://z.ai/blog/glm-5.3",
       },
-      osWorld: NA("https://z.ai/blog/glm-5.2"),
-      mmmuPro: NA("https://z.ai/blog/glm-5.2"),
+      osWorld: NA(
+        "https://z.ai/blog/glm-5.3",
+        "GLM 官方未发布 OSWorld 同名结果",
+      ),
+      mmmuPro: NA(
+        "https://z.ai/blog/glm-5.3",
+        "GLM 官方未发布 MMMU-Pro 同名结果",
+      ),
     },
   },
   {
@@ -533,47 +657,49 @@ const TEXT_MODELS: TextModel[] = [
     parameters: "1.6T / 49B 激活",
     officialUrl: "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
     metrics: {
-      nl2Repo: NA(
-        "https://artificialanalysis.ai/models/deepseek-v4-pro",
-        "AA 未发布 0813 的 NL2Repo 同名结果",
-      ),
-      sciCode: {
-        value: "49.2%",
-        score: 49.2,
-        source: "Artificial Analysis · SciCode / max",
-        href: "https://artificialanalysis.ai/models/deepseek-v4-pro",
+      nl2Repo: {
+        value: "61.5%",
+        score: 61.5,
+        source: "DeepSeek 官方模型卡 · DeepSeek Harness / max",
+        href: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813",
       },
-      ale: NA(
-        "https://artificialanalysis.ai/models/deepseek-v4-pro",
-        "AA 未发布 0813 的 ALE 同名结果",
+      terminal3: NA(
+        "https://www.frontierbench.ai/",
+        "Terminal-Bench 3.0 官方榜未收录 DeepSeek-V4-Pro-0813",
       ),
+      ale: {
+        value: "25.7%",
+        score: 25.7,
+        source: "DeepSeek 官方模型卡 · DeepSeek Harness / max",
+        href: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813",
+      },
       terminal: {
-        value: "78.7%",
-        score: 78.7,
-        source: "Artificial Analysis · Terminal-Bench 2.1 / max",
-        href: "https://artificialanalysis.ai/models/deepseek-v4-pro",
+        value: "87.9%",
+        score: 87.9,
+        source: "DeepSeek 官方模型卡 · DeepSeek Harness / max",
+        href: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813",
       },
       mcpAtlas: NA(
-        "https://artificialanalysis.ai/models/deepseek-v4-pro",
-        "AA 未发布 0813 的 MCP-Atlas 同名结果",
+        "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813",
+        "DeepSeek 官方模型卡未发布 MCP-Atlas 同名结果",
       ),
       swePro: NA(
-        "https://artificialanalysis.ai/models/deepseek-v4-pro",
-        "AA 未发布 0813 的 SWE Pro 同名结果",
+        "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813",
+        "DeepSeek 官方模型卡未发布 SWE Pro 同名结果",
       ),
       deepSwe: {
-        value: "8.6%",
-        score: 8.6,
-        source: "AA v1.3 · Claude Code / high",
-        href: "https://artificialanalysis.ai/agents/coding-agents",
+        value: "62.7%",
+        score: 62.7,
+        source: "DeepSeek 官方模型卡 · DeepSWE 1.1 / DeepSeek Harness / max",
+        href: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813",
       },
       osWorld: NA(
-        "https://artificialanalysis.ai/models/deepseek-v4-pro",
-        "AA 未发布 0813 的 OSWorld 同名结果",
+        "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813",
+        "DeepSeek 官方模型卡未发布 OSWorld 同名结果",
       ),
       mmmuPro: NA(
-        "https://artificialanalysis.ai/models/deepseek-v4-pro",
-        "AA 尚无 0813 的 MMMU-Pro 成绩",
+        "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813",
+        "DeepSeek 官方模型卡未发布 MMMU-Pro 结果",
       ),
     },
   },
@@ -594,9 +720,9 @@ const TEXT_MODELS: TextModel[] = [
         source: "DeepSeek 官方 · DeepSeek Harness 极简模式 / max",
         href: "https://api-docs.deepseek.com/zh-cn/updates/",
       },
-      sciCode: NA(
-        "https://api-docs.deepseek.com/zh-cn/updates/",
-        "DeepSeek 官方未发布 SciCode 同名结果",
+      terminal3: NA(
+        "https://www.frontierbench.ai/",
+        "Terminal-Bench 3.0 官方榜未收录 DeepSeek-V4-Flash-0731",
       ),
       ale: {
         value: "25.2%",
@@ -649,11 +775,11 @@ const TEXT_MODELS: TextModel[] = [
         "https://x.ai/news/grok-4-6",
         "xAI 与 AA 未发布 Grok 4.6 的 NL2Repo 同名结果",
       ),
-      sciCode: {
-        value: "53.6%",
-        score: 53.6,
-        source: "Artificial Analysis · SciCode / high",
-        href: "https://artificialanalysis.ai/models/grok-4-6",
+      terminal3: {
+        value: "26.5%",
+        score: 26.5,
+        source: "Terminal-Bench 3.0 官方榜 · Grok Build / high",
+        href: "https://www.frontierbench.ai/",
       },
       ale: NA(
         "https://x.ai/news/grok-4-6",
@@ -689,61 +815,6 @@ const TEXT_MODELS: TextModel[] = [
       ),
     },
   },
-  {
-    vendor: "MiniMax",
-    model: "MiniMax M3",
-    release: "2026.06",
-    access: "开放权重 / API",
-    price: "¥2.1 / ¥8.4 起",
-    priceNote: "中国区 ≤512K 基础档输入 / 输出",
-    context: "1M",
-    parameters: "428B / 23B 激活",
-    officialUrl: "https://platform.minimaxi.com/docs/guides/pricing-paygo",
-    metrics: {
-      nl2Repo: {
-        value: "42.1%",
-        score: 42.1,
-        source: "MiniMax 官方发布",
-        href: "https://www.minimax.io/blog/minimax-m3",
-      },
-      sciCode: NA("https://www.minimaxi.com/blog/minimax-m3"),
-      ale: NA("https://agents-last-exam.org/leaderboard"),
-      terminal: {
-        value: "66.0%",
-        score: 66,
-        source: "MiniMax 官方发布",
-        href: "https://www.minimaxi.com/blog/minimax-m3",
-      },
-      mcpAtlas: {
-        value: "74.2%",
-        score: 74.2,
-        source: "MiniMax 官方发布",
-        href: "https://www.minimaxi.com/blog/minimax-m3",
-      },
-      swePro: {
-        value: "59.0%",
-        score: 59,
-        source: "MiniMax 官方发布",
-        href: "https://www.minimaxi.com/blog/minimax-m3",
-      },
-      deepSwe: NA(
-        "https://artificialanalysis.ai/agents/coding-agents",
-        "AA v1.3 未收录该模型 / Agent 配置",
-      ),
-      osWorld: {
-        value: "70.1%",
-        score: 70.06,
-        source: "MiniMax 官方 · OSWorld-Verified",
-        href: "https://www.minimax.io/blog/minimax-m3",
-      },
-      mmmuPro: {
-        value: "78.1%",
-        score: 78.1,
-        source: "MiniMax 官方模型卡",
-        href: "https://huggingface.co/MiniMaxAI/MiniMax-M3",
-      },
-    },
-  },
 ];
 
 const OPUS_46_REFERENCE: Pick<TextModel, "vendor" | "model" | "metrics"> = {
@@ -751,12 +822,10 @@ const OPUS_46_REFERENCE: Pick<TextModel, "vendor" | "model" | "metrics"> = {
   model: "Claude Opus 4.6",
   metrics: {
     nl2Repo: NA("https://www.anthropic.com/news/claude-opus-4-6"),
-    sciCode: {
-      value: "51.9%",
-      score: 51.9,
-      source: "Kimi 官方模型卡交叉表",
-      href: "https://huggingface.co/moonshotai/Kimi-K2.6",
-    },
+    terminal3: NA(
+      "https://www.frontierbench.ai/",
+      "Terminal-Bench 3.0 官方榜未收录 Claude Opus 4.6",
+    ),
     terminal: {
       value: "—",
       score: null,
@@ -934,6 +1003,17 @@ const MODEL_TRACKS: ModelTrack[] = [
         specLabel: "上下文",
         spec: "1.05M",
         href: "https://www.kimi.com/zh-cn/resources/kimi-k3-pricing",
+      },
+      {
+        vendor: "智谱",
+        model: "GLM-5.3",
+        tier: "最新旗舰",
+        price: "未披露",
+        priceNote: "官方发布页未披露 API 按量价格",
+        parameters: "同 GLM-5.2 底座",
+        specLabel: "上下文",
+        spec: "1M（评测口径）",
+        href: "https://z.ai/blog/glm-5.3",
       },
       {
         vendor: "智谱",
@@ -1180,9 +1260,9 @@ const ARENA_BOARDS: Board[] = [
   {
     eyebrow: "TEXT",
     name: "Text / Overall",
-    snapshot: "2026-08-12 · Model ranking",
+    snapshot: "2026-08-21 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "Grok 4.6 High：第 43；deepseek-v4-pro：第 50。Arena 未显式标注 DeepSeek 的 0813 日期版本。",
+    note: "grok-4.6-high：第 46；deepseek-v4-pro-high-20260813：第 50。Arena 本次已显式标注 DeepSeek 的 0813 日期版本。",
     href: "https://arena.ai/leaderboard/text/overall",
     assessment: {
       source: "Arena FAQ 与排名方法",
@@ -1200,9 +1280,9 @@ const ARENA_BOARDS: Board[] = [
   {
     eyebrow: "CODE",
     name: "Coding Arena",
-    snapshot: "2026-08-12 · Model ranking",
+    snapshot: "2026-08-21 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "Grok 4.6 High：第 44；当前前 50 未出现 DeepSeek V4 Pro。",
+    note: "dola-seed-2.0-pro：第 40；DeepSeek V4 Pro 0813：第 43；Grok 4.6 High：第 44。",
     href: "https://arena.ai/leaderboard/text/coding",
     assessment: {
       source: "Arena Coding 分类说明",
@@ -1220,9 +1300,9 @@ const ARENA_BOARDS: Board[] = [
   {
     eyebrow: "WEBDEV",
     name: "WebDev Arena",
-    snapshot: "2026-08-12 · Model ranking",
+    snapshot: "2026-08-21 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "Grok 4.6 High：第 5；deepseek-v4-pro：第 46。Arena 未显式标注 DeepSeek 的 0813 日期版本。",
+    note: "Grok 4.6 High：第 5；DeepSeek V4 Pro 0813：第 12；deepseek-v4-pro：第 49。",
     href: "https://arena.ai/leaderboard/code",
     assessment: {
       source: "Code Arena 官方方法",
@@ -1240,10 +1320,10 @@ const ARENA_BOARDS: Board[] = [
   {
     eyebrow: "VISION",
     name: "Vision Arena",
-    snapshot: "2026-08-06 · Model ranking",
+    snapshot: "2026-08-21 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "含图对话；实验室聚合。",
-    href: "https://arena.ai/leaderboard/vision?rankBy=labs",
+    note: "含图对话；按模型配置排名；dola-seed-2.0-pro：第 35。",
+    href: "https://arena.ai/leaderboard/vision",
     assessment: {
       source: "Vision Arena 官方说明",
       href: "https://arena.ai/blog/multimodal/",
@@ -1262,7 +1342,7 @@ const ARENA_BOARDS: Board[] = [
     name: "Text-to-Image",
     snapshot: "2026-08-10 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "文本生图偏好；当前前 50 按模型配置列示。",
+    note: "文本生图偏好；Seedream 5.0 Pro：第 8；Seedream 5.0 Lite：第 35。",
     href: "https://arena.ai/leaderboard/text-to-image",
     assessment: {
       source: "Image Arena 质量过滤",
@@ -1280,9 +1360,9 @@ const ARENA_BOARDS: Board[] = [
   {
     eyebrow: "VIDEO",
     name: "Text-to-Video",
-    snapshot: "2026-08-10 · Model ranking",
+    snapshot: "2026-08-14 · Model ranking",
     direction: "偏好 Elo ↑",
-    note: "文本生视频；榜单当前共发布 44 行，已全量录入；Seedance 2.0 为可比版本。",
+    note: "文本生视频；榜单当前共发布 45 行，已全量录入；Seedance 2.0 / 2.5 的 720P 配置分列第 3 / 第 4。",
     href: "https://arena.ai/leaderboard/text-to-video",
     assessment: {
       source: "Video Arena 官方说明",
@@ -1302,10 +1382,10 @@ const ARENA_BOARDS: Board[] = [
 const AA_BOARDS: Board[] = [
   {
     eyebrow: "INTELLIGENCE",
-    name: "Intelligence Index v4.1",
-    snapshot: "2026-08-13 · model configurations",
+    name: "Intelligence Index v4.1.1",
+    snapshot: "2026-08-25 · v4.1.1 · model configurations",
     direction: "综合指数 ↑",
-    note: "Grok 4.6 · high 第 6；DeepSeek V4 Pro 0813 · max 第 23；V4 Flash 0731 · max 第 29。",
+    note: "当前所选 29 个配置中 28 个有综合分，已全量录入；Grok 4.6 · high 第 4，GLM-5.3 · max 第 6，DeepSeek V4 Pro 0813 · max 第 11。",
     href: "https://artificialanalysis.ai/models",
     assessment: {
       source: "AA Intelligence 方法学",
@@ -1318,21 +1398,21 @@ const AA_BOARDS: Board[] = [
       ],
       summary: "9 项基准按 4 类不等权合成：Agents 34%，Coding 24%。",
     },
-    rows: CURRENT_LEADERBOARD_ROWS["Intelligence Index v4.1"],
+    rows: CURRENT_LEADERBOARD_ROWS["Intelligence Index v4.1.1"],
   },
   {
     eyebrow: "AA CODE",
     name: "Coding Agent Index",
-    snapshot: "2026-08-13 · v1.3 · model + harness",
+    snapshot: "2026-08-25 · v1.4 · model + harness",
     direction: "Agent 编程指数 ↑",
-    note: "当前仅 45 个配置有完整指数，已全量录入；尚无 Grok 4.6 或 DeepSeek V4 Pro 0813 的明确同名配置。",
+    note: "当前 56 个完整配置，录入前 50；DeepSeek V4 Flash 0731 / Pro 0813 分列第 34 / 第 42，尚无 Grok 4.6 配置。",
     href: "https://artificialanalysis.ai/agents/coding-agents",
     assessment: {
       source: "AA Coding Agent 方法学",
       href: "https://artificialanalysis.ai/methodology/coding-agents-benchmarking",
       rows: [
         { category: "DeepSWE", weight: "⅓", description: "113 项长程软件工程任务", emphasis: true },
-        { category: "Terminal-Bench v2", weight: "⅓", description: "84 项 Agent 终端任务", emphasis: true },
+        { category: "Terminal-Bench v2.1", weight: "⅓", description: "89 项 Agent 终端任务", emphasis: true },
         { category: "SWE-Atlas-QnA", weight: "⅓", description: "124 项真实仓库问答" },
         { category: "重复运行", weight: "3 次", description: "先按任务平均，再汇总 pass@1" },
       ],
@@ -1343,9 +1423,9 @@ const AA_BOARDS: Board[] = [
   {
     eyebrow: "AGENTIC",
     name: "Agentic Index",
-    snapshot: "2026-08-13 · Model configurations",
+    snapshot: "2026-08-25 · Model configurations",
     direction: "Agentic 指数 ↑",
-    note: "Grok 4.6 · high 第 2；DeepSeek V4 Pro 0813 · max 第 14；V4 Flash 0731 · max 第 18。",
+    note: "GLM-5.3 · max 第 2；Grok 4.6 · high 第 3；DeepSeek V4 Pro 0813 · max 第 10。",
     href: "https://artificialanalysis.ai/models/capabilities/agentic/",
     assessment: {
       source: "AA Agentic Index 说明",
@@ -1363,9 +1443,9 @@ const AA_BOARDS: Board[] = [
   {
     eyebrow: "KNOWLEDGE WORK",
     name: "AA-Briefcase",
-    snapshot: "2026-08-13 · Elo leaderboard",
+    snapshot: "2026-08-25 · Elo leaderboard",
     direction: "综合 Elo ↑",
-    note: "Grok 4.6 · high 第 4；DeepSeek V4 Flash 0731 · max 第 15；0813 暂无同名成绩。",
+    note: "当前 19 个有分配置已全量录入；Grok 4.6 · xhigh / high 分列第 4 / 第 5，DeepSeek 当前无同名成绩。",
     href: "https://artificialanalysis.ai/evaluations/aa-briefcase",
     assessment: {
       source: "AA-Briefcase 方法学",
@@ -1385,24 +1465,31 @@ const AA_BOARDS: Board[] = [
 const SOURCES = [
   ["火山方舟模型与价格", "https://docs.volcengine.com/docs/82379/1544106?lang=zh#457edfd0"],
   ["Claude 最新模型与价格", "https://platform.claude.com/docs/en/about-claude/models/overview"],
+  ["Claude Opus 5 官方发布", "https://www.anthropic.com/news/claude-opus-5"],
+  ["Claude Opus 5 系统卡", "https://www-cdn.anthropic.com/c5fbac3f0b1280a933ebd26d3cb8bb9f5bdeaf48/Claude%20Opus%205%20System%20Card.pdf"],
   ["OpenAI 模型与价格", "https://developers.openai.com/api/docs/models/compare"],
   ["OpenAI GPT-5.6 官方发布", "https://openai.com/index/gpt-5-6/"],
   ["OpenAI 图像 / 视频价格", "https://developers.openai.com/api/docs/pricing"],
   ["阿里云百炼价格", "https://help.aliyun.com/zh/model-studio/model-pricing"],
   ["Qwen3.8-Max 模型与价格", "https://www.qianwenai.com/models/qwen3.8-max"],
   ["Qwen3.8-Max 官方发布", "https://qwen.ai/blog?id=qwen3.8"],
+  ["Qwen3.8-27B 官方模型卡", "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/README.md"],
+  ["Qwen3.8-27B 中国区模型与价格", "https://help.aliyun.com/zh/model-studio/qwen3-8-27b"],
   ["阿里云视频 / 图像模型", "https://help.aliyun.com/zh/model-studio/image-model"],
   ["Kimi K3 价格", "https://www.kimi.com/zh-cn/resources/kimi-k3-pricing"],
   ["Kimi K3 官方模型卡", "https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md"],
   ["智谱开放平台价格", "https://bigmodel.cn/pricing"],
+  ["GLM-5.3 官方发布", "https://z.ai/blog/glm-5.3"],
   ["GLM-5.2 官方模型卡", "https://huggingface.co/zai-org/GLM-5.2"],
   ["DeepSeek 中国区价格", "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"],
   ["DeepSeek V4 Flash 0731 官方更新", "https://api-docs.deepseek.com/zh-cn/updates/"],
-  ["DeepSeek V4 Pro 0813 · Artificial Analysis", "https://artificialanalysis.ai/models/deepseek-v4-pro"],
+  ["DeepSeek V4 Pro 0813 官方模型卡", "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813"],
   ["SpaceXAI Grok 4.6 官方发布", "https://x.ai/news/grok-4-6"],
   ["SpaceXAI Grok 4.6 模型与价格", "https://docs.x.ai/developers/grok-4-6"],
   ["MiniMax 中国区价格", "https://platform.minimaxi.com/docs/guides/pricing-paygo"],
   ["MiniMax M3 官方发布", "https://www.minimax.io/blog/minimax-m3"],
+  ["Terminal-Bench 3.0 官方榜", "https://www.frontierbench.ai/"],
+  ["Agents’ Last Exam 官方榜", "https://agents-last-exam.org/leaderboard"],
   ["LLM Stats 单项测评", "https://llm-stats.com/benchmarks"],
   ["LMArena Leaderboard", "https://arena.ai/leaderboard"],
   ["Artificial Analysis Models", "https://artificialanalysis.ai/models"],
@@ -1497,7 +1584,7 @@ export function LlmTrendsWorkbench() {
     <div className="llm-trends" id="llm-trends">
       <section className="trends-hero">
         <div className="trends-hero-copy">
-          <div className="trends-kicker"><span className="trends-live-dot" />MARKET SNAPSHOT · 2026.08.13</div>
+          <div className="trends-kicker"><span className="trends-live-dot" />MARKET SNAPSHOT · 2026.08.25</div>
           <h1>LLM<br />趋势</h1>
           <p>主力模型、Agent Benchmark 与第三方榜单。</p>
           <div className="trends-hero-actions">
@@ -1683,7 +1770,7 @@ export function LlmTrendsWorkbench() {
       <section className="trends-section trends-sources-section" id="trend-sources">
         <div className="trends-section-heading"><div><p>SOURCE LEDGER</p><h2>数据来源</h2></div><span>厂商官网优先；缺失项使用独立榜单。</span></div>
         <div className="trends-source-grid trend-source-grid-compact">{SOURCES.map(([label, href]) => <article key={href}><a href={href} target="_blank" rel="noreferrer"><span>{label}</span><b>↗</b></a></article>)}</div>
-        <div className="trends-method-note"><strong>范围</strong><p>截至 2026-08-13 可核验的正式模型；静态快照，不自动抓榜或调用 API。</p></div>
+        <div className="trends-method-note"><strong>范围</strong><p>截至 2026-08-25 可核验的正式模型；静态快照，不自动抓榜或调用 API。</p></div>
       </section>
     </div>
   );

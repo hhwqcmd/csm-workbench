@@ -6,6 +6,7 @@ import {
   type WorkspaceView,
 } from "../lib/workspace-navigation";
 import { AiCodingWorkbench } from "./AiCodingWorkbench";
+import { AnthropicMessagesWorkbench } from "./AnthropicMessagesWorkbench";
 import { ManagedAgentsWorkbench } from "./ManagedAgentsWorkbench";
 import { LlmTrendsWorkbench } from "./LlmTrendsWorkbench";
 import { ResponsesWorkbench } from "./ResponsesWorkbench";
@@ -25,24 +26,52 @@ const WORKSPACE_VIEWS: Array<{
   { id: "seedream", index: "03", label: "Seedream", shortLabel: "图片" },
   { id: "responses", index: "04", label: "Responses API", shortLabel: "Resp." },
   {
-    id: "managed-agents",
+    id: "anthropic-messages",
     index: "05",
+    label: "Messages API",
+    shortLabel: "Msg.",
+  },
+  {
+    id: "managed-agents",
+    index: "06",
     label: "Managed Agents",
     shortLabel: "Agent",
   },
   {
     id: "llm-trends",
-    index: "06",
+    index: "07",
     label: "LLM 趋势",
     shortLabel: "趋势",
   },
   {
     id: "ai-coding",
-    index: "07",
+    index: "08",
     label: "AI coding",
     shortLabel: "Code",
   },
 ];
+
+const WORKSPACE_HASHES: Record<WorkspaceView, string> = {
+  templates: "#templates",
+  seedance: "#operations",
+  seedream: "#seedream",
+  responses: "#responses",
+  "anthropic-messages": "#anthropic-messages",
+  "managed-agents": "#managed-agents",
+  "llm-trends": "#llm-trends",
+  "ai-coding": "#ai-coding",
+};
+
+const WORKSPACE_TARGETS: Record<WorkspaceView, string> = {
+  templates: "templates",
+  seedance: "operations",
+  seedream: "seedream",
+  responses: "responses",
+  "anthropic-messages": "anthropic-messages",
+  "managed-agents": "managed-agents",
+  "llm-trends": "llm-trends",
+  "ai-coding": "ai-coding",
+};
 
 function viewFromHash(): WorkspaceView {
   const hash = window.location.hash;
@@ -64,6 +93,13 @@ function viewFromHash(): WorkspaceView {
     return "managed-agents";
   }
   if (window.location.hash.startsWith("#responses")) return "responses";
+  if (
+    ["#anthropic-messages", "#anthropic-editor", "#anthropic-schema", "#anthropic-"].some(
+      (anchor) => hash.startsWith(anchor),
+    )
+  ) {
+    return "anthropic-messages";
+  }
   if (
     [
       "#llm-trends",
@@ -114,44 +150,18 @@ export function WorkspaceShell() {
         nextView !== "seedream" &&
         nextView !== "managed-agents" &&
         nextView !== "responses" &&
+        nextView !== "anthropic-messages" &&
         nextView !== "llm-trends" &&
         nextView !== "ai-coding"
       ) {
         return;
       }
       setView(nextView);
-      const nextHash =
-        nextView === "templates"
-          ? "#templates"
-          : nextView === "seedream"
-            ? "#seedream"
-            : nextView === "managed-agents"
-              ? "#managed-agents"
-              : nextView === "responses"
-                ? "#responses"
-                : nextView === "llm-trends"
-                  ? "#llm-trends"
-                  : nextView === "ai-coding"
-                    ? "#ai-coding"
-                : "#operations";
+      const nextHash = WORKSPACE_HASHES[nextView];
       window.history.replaceState(null, "", nextHash);
       window.setTimeout(() => {
         document
-          .getElementById(
-            nextView === "templates"
-              ? "templates"
-              : nextView === "seedream"
-                ? "seedream"
-                : nextView === "managed-agents"
-                  ? "managed-agents"
-                  : nextView === "responses"
-                    ? "responses"
-                    : nextView === "llm-trends"
-                      ? "llm-trends"
-                      : nextView === "ai-coding"
-                        ? "ai-coding"
-                    : "operations",
-          )
+          .getElementById(WORKSPACE_TARGETS[nextView])
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 0);
     }
@@ -179,21 +189,7 @@ export function WorkspaceShell() {
   function selectView(nextView: WorkspaceView) {
     setView(nextView);
     const nextHash =
-      nextView === "templates"
-        ? "#templates"
-        : nextView === "seedance"
-          ? "#seedance"
-        : nextView === "seedream"
-          ? "#seedream"
-          : nextView === "managed-agents"
-            ? "#managed-agents"
-            : nextView === "responses"
-              ? "#responses"
-              : nextView === "llm-trends"
-                ? "#llm-trends"
-                : nextView === "ai-coding"
-                  ? "#ai-coding"
-              : "#top";
+      nextView === "seedance" ? "#seedance" : WORKSPACE_HASHES[nextView];
     window.history.replaceState(null, "", nextHash);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -237,6 +233,8 @@ export function WorkspaceShell() {
             href={
               view === "responses"
                 ? "https://docs.volcengine.com/docs/82379/1585128?lang=zh"
+                : view === "anthropic-messages"
+                ? "https://docs.volcengine.com/docs/82379/2160841?lang=zh"
                 : view === "ai-coding"
                 ? "https://docs.trae.cn/cli_what-is-trae-cli"
                 : view === "llm-trends"
@@ -358,18 +356,26 @@ export function WorkspaceShell() {
 
       <div
         className="workspace-view"
-        data-active={view === "managed-agents"}
-        hidden={view !== "managed-agents"}
-      >
-        <ManagedAgentsWorkbench />
-      </div>
-
-      <div
-        className="workspace-view"
         data-active={view === "responses"}
         hidden={view !== "responses"}
       >
         <ResponsesWorkbench />
+      </div>
+
+      <div
+        className="workspace-view"
+        data-active={view === "anthropic-messages"}
+        hidden={view !== "anthropic-messages"}
+      >
+        <AnthropicMessagesWorkbench />
+      </div>
+
+      <div
+        className="workspace-view"
+        data-active={view === "managed-agents"}
+        hidden={view !== "managed-agents"}
+      >
+        <ManagedAgentsWorkbench />
       </div>
 
       <div
@@ -391,8 +397,8 @@ export function WorkspaceShell() {
       <footer>
         <p>火山方舟 API 演示与模板资产平台</p>
         <span>
-          Seedance · Seedream · Responses API · Managed Agents · LLM 趋势 · AI coding ·
-          完整请求审核 · 历史与脱敏日志
+          Seedance · Seedream · Responses API · Messages API · Managed Agents ·
+          LLM 趋势 · AI coding · 完整请求审核 · 历史与脱敏日志
         </span>
       </footer>
     </main>

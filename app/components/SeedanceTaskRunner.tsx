@@ -42,6 +42,7 @@ import {
   estimateSeedanceBatchCost,
   SEEDANCE_PRICING_SOURCE,
 } from "../lib/seedance-pricing";
+import { CopyCurlButton } from "./CopyCurlButton";
 import { SaveToMaterialLibraryButton } from "./SaveToMaterialLibraryButton";
 import { APPLY_EXAMPLE_EVENT } from "./SeedanceExampleGallery";
 
@@ -2320,7 +2321,19 @@ export function SeedanceTaskRunner() {
             <span className="config-kicker">LIVE API REQUEST</span>
             <h3 id="api-details-heading">完整 API 请求详情</h3>
           </div>
-          <span className="sync-badge">双向联动</span>
+          <div className="api-details-actions">
+            <span className="sync-badge">双向联动</span>
+            <CopyCurlButton
+              body={upstreamRequestBody}
+              containsApiKey={Boolean(apiKey.trim())}
+              headers={{
+                Authorization: `Bearer ${apiKey.trim() || "<ARK_API_KEY>"}`,
+                "Content-Type": "application/json",
+              }}
+              method="POST"
+              url={createEndpoint}
+            />
+          </div>
         </div>
 
         <div className="api-meta-grid">

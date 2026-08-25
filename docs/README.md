@@ -9,6 +9,7 @@
 - [真实任务工作流](./task-runner.md)：请求表单、服务端路由、30 秒轮询、安全与费用边界。
 - [Seedream 图片生成演示](./seedream.md)：十类官方图片玩法、Prompt 技巧、一键优化、流式输出、历史与安全边界。
 - [Responses API 演示](./responses-api.md)：八类场景、完整输入/输出协议、SSE、生命周期、缓存、工具、安全与日志边界。
+- [Messages API 演示](./anthropic-messages-api.md)：方舟 Anthropic 兼容入口、八类无状态场景、thinking/signature、多模态、工具闭环、Prompt Caching、SSE 聚合与安全边界。
 - [Managed Agents 工作流](./managed-agents.md)：Agent、云环境、Session 生命周期、SSE、文件挂载、Memory Store 与日志边界。
 - [LLM 趋势栏目](./llm-trends.md)：Seed 主力模型、最新竞品、价格/参数/重点 benchmark、Arena 与 Artificial Analysis 快照及更新口径。
 - [AI coding 最佳实践](./ai-coding.md)：规格、知识、计划、受控执行、验收与经验回流的六步演示，18 个可复制模板，以及面向全链路结果的模拟指标和同源 API 口径。
@@ -25,5 +26,6 @@
 - [Seedance 2.0 提示词指南](https://docs.volcengine.com/docs/82379/2222480?lang=zh)：提示词公式、编写技巧与模板案例来源。
 - [Seedream 图片生成教程](https://docs.volcengine.com/docs/82379/1824121?lang=zh)、[Seedream 4.0–5.0 提示词指南](https://docs.volcengine.com/docs/82379/1829186?lang=zh)：图片示例类型、能力约束、请求字段和场景化 Prompt 技巧。
 - [Responses API 总览](https://docs.volcengine.com/docs/82379/1585128?lang=zh)、[文本](https://docs.volcengine.com/docs/82379/1958520?lang=zh)、[推理](https://docs.volcengine.com/docs/82379/1956279?lang=zh)、[多模态](https://docs.volcengine.com/docs/82379/1958521?lang=zh)、[工具](https://docs.volcengine.com/docs/82379/1958524?lang=zh)、[缓存](https://docs.volcengine.com/docs/82379/1602228?lang=zh)：Responses 工作台的协议和能力依据。
+- [方舟 Anthropic Messages API 接入](https://docs.volcengine.com/docs/82379/2160841?lang=zh)、[Anthropic Create a Message](https://platform.claude.com/docs/en/api/messages/create)：Messages 工作台的方舟入口、无状态消息、内容块、流式和工具协议依据。
 
 当前规则放在仓库根目录的 `AGENTS.md`；本目录承载原因、协议和证据，避免 AGENTS.md 退化为逐文件百科或时间流水账。

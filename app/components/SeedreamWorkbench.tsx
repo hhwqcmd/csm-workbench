@@ -25,6 +25,7 @@ import {
   importGeneratedMaterial,
   readMaterialAssets,
 } from "../lib/material-assets";
+import { CopyCurlButton } from "./CopyCurlButton";
 import { SaveToMaterialLibraryButton } from "./SaveToMaterialLibraryButton";
 
 type ResultImage = {
@@ -1348,16 +1349,28 @@ export function SeedreamWorkbench() {
                   <span>完整 API 请求详情</span>
                   <small>表单 ↔ JSON 双向联动</small>
                 </div>
-                <button
-                  onClick={() => {
-                    setApiEditing((current) => !current);
-                    setApiDraft(requestJson);
-                    setApiDraftError("");
-                  }}
-                  type="button"
-                >
-                  {apiEditing ? "取消编辑" : "编辑 JSON"}
-                </button>
+                <div className="seedream-api-actions">
+                  <CopyCurlButton
+                    body={requestBody}
+                    containsApiKey={Boolean(apiKey.trim())}
+                    headers={{
+                      Authorization: `Bearer ${apiKey.trim() || "<ARK_API_KEY>"}`,
+                      "Content-Type": "application/json",
+                    }}
+                    method="POST"
+                    url={generationEndpoint}
+                  />
+                  <button
+                    onClick={() => {
+                      setApiEditing((current) => !current);
+                      setApiDraft(requestJson);
+                      setApiDraftError("");
+                    }}
+                    type="button"
+                  >
+                    {apiEditing ? "取消编辑" : "编辑 JSON"}
+                  </button>
+                </div>
               </header>
               <dl>
                 <div>

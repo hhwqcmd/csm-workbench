@@ -50,6 +50,16 @@ Responses API 路径
   → 标准 API 白名单 Base URL
   → Responses API（创建、检索、Input Items、删除与 SSE）
 
+Messages API（Anthropic 兼容）路径
+浏览器
+  → AnthropicMessagesWorkbench
+  → POST /api/anthropic-messages（请求包仅含 apiKey、trace、requestBody）
+  → app/lib/anthropic-messages-server.ts
+  → 固定 https://ark.cn-beijing.volces.com/api/compatible/v1/messages
+  → 固定 Authorization Bearer、Content-Type 与 anthropic-version: 2023-06-01
+  → 同步 Message 或已脱敏 Anthropic SSE
+  → app/lib/anthropic-messages-stream.ts 重建最终 Message
+
 素材沉淀路径
 Seedance / Seedream / TemplateAssetLibrary
   → POST /api/materials/import 或 /api/materials/upload
@@ -92,7 +102,7 @@ AI coding 路径
 当前服务端模块负责：
 
 1. 接收浏览器本次手工输入的 Key，但不在服务端持久化、记录或回显。
-2. Seedance 将 API 路径限制为标准 API 与 Agent Plan 两个精确 Base URL；Seedream、Responses API 与 Managed Agents 只允许标准 `/api/v3`。
+2. Seedance 将 API 路径限制为标准 API 与 Agent Plan 两个精确 Base URL；Seedream、Responses API 与 Managed Agents 只允许标准 `/api/v3`；Anthropic Messages 只允许固定 `/api/compatible/v1/messages`，浏览器不能选择 Base URL 或版本头。
 3. 校验模型属于对应路径；Agent Plan 使用套餐别名，标准 API 使用日期版本 Model ID。
 4. 校验通用 `content` 多模态数组、素材 URL、时长、比例、4K 模型限制与联网搜索纯文本限制；标准 API 的 Seedance 2.5 额外校验并转发 `omni_reference_task_type`。
 5. 创建任务并只向浏览器返回必要的任务 ID。
@@ -101,7 +111,8 @@ AI coding 路径
 8. Managed Agents 校验 Agent 创建/版本化更新的完整字段、Skills/Tools/MCP/Multi Agent 约束，以及云环境、Session、事件、文件资源与 Memory Store/Memory 结构；事件流必须先建立上游 SSE，再发送用户事件。
 9. Seedream 校验 Pro/Lite 模型能力、图片公网地址、输入数量、尺寸、组图、联网、流式、图片 API Prompt 优化参数和 Prompt 内 point/bbox 标签；坐标不进入独立上游字段。真实生成先创建可恢复任务并把匿名令牌写入浏览器，再由独立 `run` 请求执行长调用，D1 只保存 24 小时状态、URL 结果和脱敏错误，API Key、Prompt、参考图与完整请求只存在于执行请求内存；Prompt 一键优化只使用服务端内置场景技巧调用 `doubao-seed-evolving`。
 10. Responses API 校验完整顶层字段、InputItem 素材 URL、工具必填项、缓存互斥和生命周期 ID；同步 JSON 与 SSE 均在返回浏览器前执行凭证脱敏。
-11. 素材接口固定 TOS bucket、Endpoint、Region 与 `demo/` 前缀，校验 MIME、大小、对象键和公网 HTTPS 重定向；图片在校验后以不超过 20 MB 的固定长度二进制请求体上传，视频和音频保持限流流式上传；TOS AK/SK 只用于服务端签名，不进入浏览器或错误响应。
+11. Anthropic Messages 校验 user/assistant role、system 位置、核心内容块、HTTPS/Base64 素材、tool_use/tool_result ID、thinking budget/signature、缓存结构、采样值、JSON 深度与危险对象键；同步 JSON 与完整 SSE frame 均执行敏感字段和值级脱敏，SSE 支持凭证跨 chunk 拆分。
+12. 素材接口固定 TOS bucket、Endpoint、Region 与 `demo/` 前缀，校验 MIME、大小、对象键和公网 HTTPS 重定向；图片在校验后以不超过 20 MB 的固定长度二进制请求体上传，视频和音频保持限流流式上传；TOS AK/SK 只用于服务端签名，不进入浏览器或错误响应。
 
 浏览器负责收集参数、管理本机演示凭证、生成完整 API 预览、保存任务历史与脱敏日志、展示状态和播放结果。
 
@@ -116,7 +127,7 @@ AI coding 路径
 - 每次点击提交先创建本地记录，再发起请求；创建失败但未取得远端任务 ID 的尝试仍可在历史中查看。
 - 日志保存创建请求和后续状态查询的请求/响应。Authorization 只保存掩码，服务端仍不记录 Key。
 - 八个官方示例集中定义在 `app/lib/seedance-examples.ts`；示例卡片通过显式事件把整份 Request Body 和可选连续生成计划交给实操台，避免页面展示值与实际请求分叉。连续生成是独立的任务八，不再依附任务七。
-- `WorkspaceShell` 管理“模板资产库 / Seedance / Seedream / Responses API / Managed Agents / LLM 趋势 / AI coding”七个平级视图；无 Hash 默认展示模板资产库，视频示例与模板复用 `SeedanceTaskRunner`。
+- `WorkspaceShell` 管理“模板资产库 / Seedance / Seedream / Responses API / Messages API / Managed Agents / LLM 趋势 / AI coding”八个平级视图；Messages API 固定序号 05，窄屏使用八等分短标签；无 Hash 默认展示模板资产库，视频示例与模板复用 `SeedanceTaskRunner`。
 - 模板预填统一通过 `seedance:apply-example` 事件进入任务执行器；影视和营销模板允许用空 URL 表达缺失素材，执行器既有的 `requestReady` 校验会在补齐前阻止真实提交。
 - 四类模板集中定义在 `app/lib/template-assets.ts`。提示词公式只提供复制；电商、影视和营销场景模板通过相同 `seedance:apply-example` 事件把整份 Request Body 交给实操台，缺失素材用空 URL 表达。
 - 连续视频链路仍复用同一创建/查询 API；每段的 `last_frame_url` 只在上一段成功后作为下一段输入，不引入新的服务端代理入口。
@@ -129,6 +140,7 @@ AI coding 路径
 - Seedream 十类示例集中定义在 `app/lib/seedream-examples.ts`。默认图片模型为 `doubao-seedream-5-0-pro-260628`；官方未支持 Pro 的组图、联网和流式场景显式切换为 Lite。Prompt 编辑框的一键优化调用 `doubao-seed-evolving`，并把当前示例的服务端可信技巧作为约束。
 - Seedream 最近 30 次生成与优化操作单独保存在当前浏览器，Authorization 只保存掩码。浏览器另存一份匿名恢复令牌，刷新后查询 D1 中最长保留 24 小时的活跃任务；服务端任务表不保存 API Key、Prompt、参考图或完整请求。可恢复任务固定要求 `response_format=url`，Base64 结果仍只适用于兼容直连路由。
 - Responses API 八类示例集中定义在 `app/lib/responses-examples.ts`；高频参数表单与完整 JSON 共享同一份 Request Body。最近 30 次操作单独保存在当前浏览器，流式事件保留原始时间线并提取文本，所有敏感字段在记录前脱敏。
+- Anthropic Messages API 八类示例集中定义在 `app/lib/anthropic-messages-examples.ts`；默认模型可编辑，stream 为通用开关。最近 30 次调用使用独立本机历史，Authorization 不保存明文，Base64 写入前压缩。SSE 同时保留已脱敏原始事件和重建 Message；工具按钮只生成下一轮 tool_result 模板，不执行真实工具。
 - 素材库的“模板分类”和“素材库”平级；素材库按视频、图片、音频分栏。`app/lib/material-assets.ts` 只保存对象元数据和稳定对象键，原始生成 URL、文件内容、TOS 凭证与预签名 URL都不进入本地索引。
 
 ## 状态模型
@@ -151,6 +163,7 @@ AI coding 路径
 - Managed Agents 资源与事件 API 固定在标准 `/api/v3`；Agent Plan 地址不开放给该模块。
 - Seedream 图片生成与 Prompt 优化固定在标准 `/api/v3`；页面加载、示例切换和自动化测试不会产生图片或文本模型调用。刷新只使用匿名令牌查询已创建任务，不会重复创建计费请求。
 - Responses API 创建、检索、Input Items 和删除固定在标准 `/api/v3`；真实创建与工具调用需要费用确认，永久删除需要单独确认，页面加载和自动化测试不会产生真实调用。
+- Anthropic Messages API 固定在方舟标准兼容 `/api/compatible/v1/messages`，只使用普通方舟 Key；不开放 Agent Plan、Anthropic 原厂、任意 Base URL 或任意版本头。该接口只有无状态创建，真实调用需要费用确认；页面加载、模板生成、cURL 复制和自动化测试不会产生真实调用。
 - 素材保存、上传和删除是独立显式操作，不会再次调用 Seedance 或 Seedream。素材列表使用服务端 Header 签名，只列举固定 `demo/` 三类前缀，兼容 TOS 原生 JSON 与 XML 响应并与 D1 对账；目录缺项须经 HEAD 404 复核后才能清理索引，旧浏览器缓存也只在服务端 HEAD 校验对象后补写 D1。缺少 `tos:ListBucket` 时列表降级返回 D1/缓存并明确告警；预签名 URL 不持久化。当前仅在本地测试，写入、列举和删除接口仍无应用内身份鉴权并可能产生真实 TOS 费用；固定路径、大小、MIME 与 SSRF 校验只限制请求形态。既有 Sites 版本已限制为仅项目所有者访问，短期内不再更新。
 - LLM 趋势不接收 Key、不调用任何模型或榜单 API；来源链接只在用户主动点击后打开厂商或第三方页面。
 - AI coding 指标接口只读取代码库中的模拟快照；页面加载只会发起同源只读 GET，不请求外部系统，也不收集开发者、仓库或会话级真实数据。

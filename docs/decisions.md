@@ -124,12 +124,12 @@
 - **原因**：只做参数百科不便于演示，只做少数表单又会遗漏复杂联合结构；“高频表单 + 完整 JSON + 协议目录”既能讲场景，也能审核实际请求。
 - **约束**：只使用标准 `/api/v3`；浏览器不直连上游；创建、查询 Input Items 与删除均经同源代理；真实创建需费用确认，删除需不可逆确认；服务端拒绝未知顶层字段、危险 URL 和缓存冲突；自动化测试只使用模拟上游。
 
-## D018：七个顶级栏目共用演示优先的导航与视觉节奏
+## D018：八个顶级栏目共用演示优先的导航与视觉节奏
 
-- **状态**：有效，2026-08-05 更新
-- **决定**：顶级栏目固定按“模板资产库 → Seedance → Seedream → Responses API → Managed Agents → LLM 趋势 → AI coding”排列；无 Hash 时进入模板资产库，旧 `#sample` / `#operations` 深链继续进入 Seedance。桌面端显示序号和当前位置，窄屏改为七等分短标签。
+- **状态**：有效，2026-08-25 更新
+- **决定**：顶级栏目固定按“模板资产库 → Seedance → Seedream → Responses API → Messages API → Managed Agents → LLM 趋势 → AI coding”排列；Messages API 固定序号 05，其后栏目顺延为 06–08。无 Hash 时进入模板资产库，旧 `#sample` / `#operations` 深链继续进入 Seedance，`#anthropic-messages` / `#anthropic-editor` / `#anthropic-schema` 进入 Messages 工作台。桌面端显示序号和当前位置，窄屏改为八等分短标签。
 - **原因**：现场演示需要讲解者随时确认所在模块，并在投屏和窄屏下保持首屏完整。原导航在中等宽度信息拥挤，移动端多行换行还会让哈希定位内容被粘性顶部栏遮挡。
-- **约束**：视觉层只调整布局和呈现，不改变各模块的请求状态、凭证、费用确认、API 路由或本机历史；七个入口必须保持键盘可达，窄屏不得产生横向页面滚动。
+- **约束**：视觉层只调整布局和呈现，不改变各模块的请求状态、凭证、费用确认、API 路由或本机历史；八个入口必须保持键盘可达，窄屏不得产生横向页面滚动。
 
 ## D019：LLM 趋势采用有日期的静态研究快照
 
@@ -193,3 +193,10 @@
 - **决定**：仅 Seedream 5.0 Pro + 参考图启用 point/bbox 可视化；覆盖层、芯片、手工 Prompt 和完整 JSON 都解析/修改同一组 `图N<point>` / `图N<bbox>` 标签，不增加 Request Body 字段或独立持久化。
 - **原因**：坐标标签本身就是官方 Prompt 协议。另建 annotation 字段会产生双事实源，并让历史、日志和 JSON 回填发生漂移。
 - **约束**：坐标归一化到 0–999；图号严格跟随 image 数组顺序；Lite、越界图号、错误格式/坐标和无效 bbox 前后端同时拒绝真实提交；预览失败只影响可视化编辑，不触发生成调用。
+
+## D028：Messages API 采用固定方舟兼容入口与无状态场景工作台
+
+- **状态**：有效，2026-08-25 生效
+- **决定**：Messages API 作为顶级栏目 05，只接方舟 Anthropic 兼容入口 `https://ark.cn-beijing.volces.com/api/compatible/v1/messages`，使用普通方舟 Key，并由服务端固定追加 `anthropic-version: 2023-06-01`。八类场景共用表单/JSON/cURL、同步响应、完整 SSE 时间线与 Message 聚合、历史和脱敏日志；接口只提供无状态创建，不引入 Responses 生命周期操作。
+- **原因**：Anthropic Messages 的 role/content block、thinking signature、tool_use/tool_result 和 SSE 事件模型与 Responses API 不同，强行复用同一请求协议会模糊兼容边界；固定同源入口又能避免把演示服务改造成任意主机或任意版本代理。
+- **约束**：可执行字段只开放方舟核心兼容白名单；`output_config`、container/skills、Anthropic Server Tools、`inference_geo` 等仅作“方舟兼容性待验证”的只读参考。服务端必须校验角色、内容块、HTTPS/Base64 素材、工具 ID、thinking budget/signature、缓存与 JSON 结构，并在同步/SSE 返回前脱敏。真实创建必须费用确认，工具按钮只生成下一轮 tool_result 模板；历史独立保留最多 30 条、不保存明文凭证并压缩 Base64。自动化测试只模拟上游，不执行付费调用或 Sites 部署。

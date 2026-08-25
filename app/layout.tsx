@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 const title = "火山方舟 API 演示与模板资产平台";
 const description =
-  "在同一平台体验 Seedance、Seedream、Responses API、Managed Agents、LLM 趋势与企业 AI coding 最佳实践，编辑完整 API、比较模型并追踪结果与脱敏日志。";
+  "在同一平台体验 Seedance、Seedream、Responses API、Messages API（Anthropic 兼容）、Managed Agents、LLM 趋势与企业 AI coding 最佳实践，编辑完整 API、比较模型并追踪结果与脱敏日志。";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();

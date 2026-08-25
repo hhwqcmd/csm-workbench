@@ -2,19 +2,20 @@
 
 ## 当前项目定位
 
-本项目是火山方舟 API 演示与模板资产平台，包含七个平级顶层栏目：
+本项目是火山方舟 API 演示与模板资产平台，包含八个平级顶层栏目：
 
 1. **模板资产库**：浏览提示词与场景模板，并以本机索引管理保存到私有 TOS 的视频、图片和音频素材。
 2. **Seedance**：配置官方 API 或 Agent Plan、审核完整请求、创建异步任务、查看结果/历史/日志，并显式保存成功视频到素材库。
 3. **Seedream**：覆盖官方图片教程的十类非故事书示例，提供 Prompt 优化、完整 API、结果、历史、日志和图片素材保存。
 4. **Responses API**：覆盖文本、多轮、推理、多模态、Function、内置工具、缓存与结构化输出，联动展示完整输入/输出协议、SSE、历史和脱敏日志。
-5. **Managed Agents**：创建或更新 Agent、配置 Agent 环境，并统一管理 Session 生命周期、事件流、文件挂载与持久化记忆。
-6. **LLM 趋势**：以日期快照展示 Seed、Seedance、Seedream 主力模型，并对比各厂商最新文本旗舰的价格、参数、编程、长程、Agent benchmark 与第三方榜单。
-7. **AI coding**：以存量接口变更为贯穿案例，演示“规格 → 知识 → 计划 → 护栏执行 → 验收 → 回流”的企业 AI coding 闭环；四个承载栏目仍为 Agent 资产管理、项目资产、代码质量门禁与模拟组织效能指标，不绑定具体产品。
+5. **Messages API**：只接方舟标准 Anthropic 兼容入口，覆盖无状态多轮、Prefill、thinking/signature、多模态、客户端 Tool Use/tool_result、Prompt Caching、同步/SSE、历史与脱敏日志。
+6. **Managed Agents**：创建或更新 Agent、配置 Agent 环境，并统一管理 Session 生命周期、事件流、文件挂载与持久化记忆。
+7. **LLM 趋势**：以日期快照展示 Seed、Seedance、Seedream 主力模型，并对比各厂商最新文本旗舰的价格、参数、编程、长程、Agent benchmark 与第三方榜单。
+8. **AI coding**：以存量接口变更为贯穿案例，演示“规格 → 知识 → 计划 → 护栏执行 → 验收 → 回流”的企业 AI coding 闭环；四个承载栏目仍为 Agent 资产管理、项目资产、代码质量门禁与模拟组织效能指标，不绑定具体产品。
 
 官方 Python 快速示例作为协议和素材基线独立保留，不是产品页面主线。页面不得重新加入共学进度、环境安装步骤或教程路线。
 
-当前事实（最后核对：2026-08-13）：
+当前事实（最后核对：2026-08-25）：
 
 - 默认连接为标准官方 API + `doubao-seedance-2-0-mini-260615`，同时支持 Agent Plan 套餐通道。
 - 项目处于测试阶段，只在本地开发、调试和运行。`.openai/hosting.json` 保留既有 Sites `project_id` 作为历史关联，但短期内不得保存或部署新版本；既有站点已收紧为仅项目所有者可访问。
@@ -34,6 +35,8 @@
 - `app/api/seedream/`：图片后台任务、兼容生成入口和 Prompt 优化同源路由。
 - `app/components/ResponsesWorkbench.tsx`：Responses API 八类场景、表单/JSON 联动、生命周期操作、SSE、响应、完整协议目录、历史与日志。
 - `app/lib/responses-examples.ts`、`app/lib/responses-server.ts`、`app/api/responses/route.ts`：示例与字段目录、标准 Base URL 白名单、请求校验、同步/流式代理和生命周期入口。
+- `app/components/AnthropicMessagesWorkbench.tsx`：Messages 八类场景、通用 stream 开关、表单/JSON/cURL、同步结果、完整 SSE 时间线与 Message 聚合、tool_result 模板、历史和脱敏日志。
+- `app/lib/anthropic-messages-examples.ts`、`app/lib/anthropic-messages-server.ts`、`app/lib/anthropic-messages-stream.ts`、`app/api/anthropic-messages/route.ts`：兼容协议示例、固定 URL/版本头、请求白名单与安全校验、跨 chunk 脱敏、SSE 聚合和同源创建入口。
 - `app/components/ManagedAgentsWorkbench.tsx`：Managed Agents 三步表单；第 3 步含 Session 生命周期、事件、Files/Resources、TOS 与 Memory Store/Memory 管理；三步都展示完整 API 与响应，并负责资源 ID、SSE、历史与日志。
 - `app/components/LlmTrendsWorkbench.tsx`：Seed / Seedance / Seedream 与同赛道型号对比表、九项单项 benchmark、Arena / Artificial Analysis 快照与来源台账；纯静态展示，不调用任何模型。
 - `app/components/AiCodingWorkbench.tsx`：产品中立的六步交付演示、Agent 执行护栏、分层知识生命周期、规格驱动质量门禁、任务后学习闭环、18 个可复制生产模板及模拟组织指标；仅效能区展示模拟数据。
@@ -61,6 +64,8 @@
 
 `ResponsesWorkbench → /api/responses → responses-server → 火山方舟 Responses API`
 
+`AnthropicMessagesWorkbench → /api/anthropic-messages → anthropic-messages-server → 方舟 Anthropic 兼容 /v1/messages`
+
 `SeedreamWorkbench → /api/seedream/jobs → D1 短期任务状态 → seedream-server → 火山方舟 Image generation API`
 
 `Seedance / Seedream / TemplateAssetLibrary → /api/materials/* → 私有 TOS demo/ + D1 素材索引 → 浏览器本机缓存`
@@ -78,6 +83,7 @@
 - 创建、轮询、历史和日志：`docs/task-runner.md`
 - Seedream 十类图片示例、Prompt 优化、流式输出与安全边界：`docs/seedream.md`
 - Responses API 八类场景、完整协议、缓存、工具、SSE 与生命周期：`docs/responses-api.md`
+- Messages API 八类无状态场景、Anthropic 兼容字段、SSE、工具闭环与安全边界：`docs/anthropic-messages-api.md`
 - Managed Agents 三步协议、Session 生命周期、SSE、文件挂载、持久化记忆与日志：`docs/managed-agents.md`
 - LLM 趋势数据口径、模型范围与更新流程：`docs/llm-trends.md`
 - AI coding 最佳实践、模拟指标口径与 API：`docs/ai-coding.md`
@@ -112,6 +118,9 @@
 - AI coding 栏目只使用仓库内模拟组织与指标数据；同源 GET 接口不得接入员工身份、真实代码内容、会话 Prompt、凭证或生产效能平台。页面不得把模拟数据表述为真实客户成效。
 - Responses 创建必须费用确认，永久删除必须不可逆确认；缓存要求 `store=true`，前缀缓存还要求 `stream=false`，且缓存不能与非 Function 内置工具混用。
 - Responses 历史最多保留 30 条并仅存当前浏览器；Authorization、MCP headers、Token、Secret 与 Password 必须脱敏。自动化测试只允许模拟上游。
+- Anthropic Messages API 固定使用 `https://ark.cn-beijing.volces.com/api/compatible/v1/messages`、普通方舟 Key 与 `anthropic-version: 2023-06-01`。浏览器请求包只能包含 `{ apiKey, trace, requestBody }`，不得开放 Base URL、版本头、Anthropic 原厂或 Agent Plan 配置。
+- Anthropic Messages 可执行字段仅限服务端白名单；`output_config`、container/skills、Anthropic Server Tools、`inference_geo` 等只读参考不得透传。消息 role、内容块、HTTPS/Base64 素材、tool_use/tool_result ID、thinking budget/signature、缓存结构、JSON 深度和危险对象键必须在服务端校验。
+- Anthropic Messages 只有无状态创建，不增加查询或删除；真实创建必须费用确认。历史独立保留最多 30 条，不保存 Key，Base64 内容必须压缩；同步与跨 chunk SSE 在返回浏览器前均须脱敏。工具回传按钮只生成模板，不得执行真实工具；自动化测试只使用模拟上游。
 - Managed Agents 只使用标准 `https://ark.cn-beijing.volces.com/api/v3` 与普通方舟 Key，不支持 Agent Plan Base URL。
 - Managed Agents 创建模式默认模型为 `doubao-seed-evolving`；Skills、Tools、MCP、Multi Agent 均为选填且默认不进入 Request Body，必须由用户添加后展开。创建响应的 Agent / Environment / Session ID 必须自动联动，不得使用伪造占位 ID 发起下一步。
 - UpdateAgent 使用 `POST /agents/{agent_id}` 并必须携带当前 `version`；成功后要采用响应的新版本。`skills` 为整组覆盖，不能把用户的“新增一个 Skill”误实现为丢失既有 Skills。
