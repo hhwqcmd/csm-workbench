@@ -15214,3 +15214,386 @@ footer span {
     padding-right: 12px;
   }
 }
+
+/* API detail readability -------------------------------------------------- */
+
+.api-details-heading {
+  gap: 20px;
+  padding-bottom: 22px;
+  padding-top: 22px;
+}
+
+.api-details-heading h3 {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.api-details-heading .config-kicker {
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.api-details-actions {
+  gap: 10px;
+}
+
+.sync-badge {
+  align-items: center;
+  display: inline-flex;
+  font-size: 10.5px;
+  font-weight: 750;
+  min-height: 38px;
+  padding: 0 13px;
+  white-space: nowrap;
+}
+
+.copy-curl-button {
+  font-size: 11.5px;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.copy-curl-button:active,
+.api-body-toolbar button:active,
+.responses-api-editor button:active,
+.seedream-api-card > header button:active,
+.seedream-api-editor > button:active {
+  transform: translateY(1px);
+}
+
+.api-meta-grid {
+  grid-template-columns: minmax(120px, 0.38fr) minmax(0, 1.62fr);
+}
+
+.api-meta-grid > div,
+.api-meta-grid > label {
+  gap: 9px;
+  padding-bottom: 16px;
+  padding-top: 16px;
+}
+
+.api-meta-grid span {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+}
+
+.api-meta-grid code,
+.api-meta-grid input {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.api-meta-grid code {
+  padding-top: 7px;
+}
+
+.api-body-toolbar {
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.api-body-toolbar strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.api-body-toolbar span {
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.api-body-toolbar button {
+  font-size: 11.5px;
+  font-weight: 680;
+  min-height: 38px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.api-body-editor textarea {
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.responses-api-editor {
+  padding: 26px;
+}
+
+.responses-api-editor > header {
+  align-items: flex-start;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  margin-bottom: 22px;
+}
+
+.responses-api-editor > header > div:first-child {
+  gap: 7px;
+  min-width: 0;
+}
+
+.responses-api-editor > header span {
+  font-size: 10.5px;
+  font-weight: 720;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+}
+
+.responses-api-editor > header strong {
+  font-size: 16px;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+}
+
+.responses-api-editor > header > .responses-api-actions,
+.responses-api-editor > header > .anthropic-api-actions {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  width: 100%;
+}
+
+.responses-api-editor button,
+.responses-json-actions button,
+.anthropic-api-actions > button {
+  align-items: center;
+  display: inline-flex;
+  font-size: 11.5px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.responses-api-summary {
+  gap: 0;
+  margin-bottom: 20px;
+}
+
+.responses-api-summary > div {
+  gap: 16px;
+  grid-template-columns: 78px minmax(0, 1fr);
+  padding: 12px 0;
+}
+
+.responses-api-summary dt {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  line-height: 1.55;
+}
+
+.responses-api-summary dd {
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+
+.responses-json-block > div:first-child {
+  min-height: 42px;
+  padding: 10px 14px;
+}
+
+.responses-json-block > div:first-child span,
+.responses-json-block > div:first-child small {
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.responses-json-block > pre,
+.responses-json-block > textarea {
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 18px;
+}
+
+.responses-json-actions {
+  padding: 12px 14px !important;
+}
+
+.seedream-api-card > header {
+  align-items: stretch;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 19px 20px;
+}
+
+.seedream-api-card > header > .seedream-api-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  width: 100%;
+}
+
+.seedream-api-card > header > div:first-child {
+  gap: 5px;
+  min-width: 0;
+}
+
+.seedream-api-card > header span {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.seedream-api-card > header small {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.seedream-api-card > header button {
+  align-items: center;
+  display: inline-flex;
+  font-size: 11.5px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.seedream-api-card dl > div {
+  gap: 14px;
+  grid-template-columns: 108px minmax(0, 1fr);
+  padding: 12px 20px;
+}
+
+.seedream-api-card dt {
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.seedream-api-card dd {
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+
+.seedream-api-card pre,
+.seedream-api-editor textarea {
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.seedream-api-card pre {
+  padding: 20px;
+}
+
+.seedream-api-editor {
+  gap: 12px;
+  padding: 18px 20px 20px;
+}
+
+.seedream-api-editor > button {
+  font-size: 12px;
+  min-height: 40px;
+  padding: 0 15px;
+}
+
+.managed-api-editor {
+  padding: 26px;
+}
+
+.managed-api-editor-heading {
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.managed-api-editor-heading span {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.managed-api-editor-heading small {
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+
+.managed-api-editor-heading strong {
+  font-size: 11.5px;
+  min-height: 34px;
+  padding: 9px 11px;
+}
+
+.managed-api-editor dl {
+  margin-bottom: 22px;
+}
+
+.managed-api-editor dl > div {
+  gap: 14px;
+  grid-template-columns: 112px minmax(0, 1fr);
+  padding: 12px 14px;
+}
+
+.managed-api-editor dt {
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.managed-api-editor dd,
+.managed-api-editor textarea {
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.managed-api-editor label > span {
+  font-size: 12px;
+}
+
+.managed-json-error,
+.managed-json-ok {
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media (max-width: 620px) {
+  .api-details-heading,
+  .responses-api-editor > header,
+  .seedream-api-card > header,
+  .managed-api-editor-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .api-details-actions,
+  .responses-api-editor > header > .responses-api-actions,
+  .anthropic-api-actions,
+  .seedream-api-card > header > .seedream-api-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    width: 100%;
+  }
+
+  .api-details-actions > *,
+  .responses-api-actions > *,
+  .anthropic-api-actions > *,
+  .seedream-api-actions > * {
+    width: 100%;
+  }
+
+  .api-details-heading,
+  .responses-api-editor,
+  .managed-api-editor {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .responses-api-summary > div,
+  .seedream-api-card dl > div,
+  .managed-api-editor dl > div {
+    grid-template-columns: 1fr;
+  }
+
+  .responses-json-block > pre,
+  .responses-json-block > textarea,
+  .seedream-api-card pre,
+  .seedream-api-editor textarea,
+  .managed-api-editor textarea {
+    font-size: 11.5px;
+  }
+}

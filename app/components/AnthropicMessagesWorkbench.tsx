@@ -512,35 +512,45 @@ export function AnthropicMessagesWorkbench() {
               </div>
             </header>
             <ApiSummary detail={apiDetail} />
-            {apiEditing ? (
-              <div className="responses-json-editor">
-                <textarea
-                  aria-label="Anthropic Request Body JSON"
-                  onChange={(event) => setApiDraft(event.target.value)}
-                  rows={28}
-                  spellCheck={false}
-                  value={apiDraft}
-                />
-                {apiDraftError && <p>{apiDraftError}</p>}
-                <div>
-                  <button onClick={applyApiDraft} type="button">
-                    应用到表单
-                  </button>
-                  <button
-                    onClick={() => {
-                      setApiEditing(false);
-                      setApiDraft(requestJson);
-                      setApiDraftError("");
-                    }}
-                    type="button"
-                  >
-                    取消
-                  </button>
-                </div>
+            <div className="responses-json-block">
+              <div>
+                <span>Request Body</span>
+                <small>
+                  {new TextEncoder().encode(requestJson).length} bytes
+                </small>
               </div>
-            ) : (
-              <pre>{requestJson}</pre>
-            )}
+              {apiEditing ? (
+                <>
+                  <textarea
+                    aria-label="Anthropic Request Body JSON"
+                    onChange={(event) => setApiDraft(event.target.value)}
+                    rows={28}
+                    spellCheck={false}
+                    value={apiDraft}
+                  />
+                  {apiDraftError && (
+                    <p className="responses-error">{apiDraftError}</p>
+                  )}
+                  <div className="responses-json-actions">
+                    <button
+                      onClick={() => {
+                        setApiEditing(false);
+                        setApiDraft(requestJson);
+                        setApiDraftError("");
+                      }}
+                      type="button"
+                    >
+                      取消
+                    </button>
+                    <button onClick={applyApiDraft} type="button">
+                      应用到表单
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <pre>{requestJson}</pre>
+              )}
+            </div>
           </div>
         </div>
 

@@ -3847,6 +3847,8 @@ test("server-renders the editable Messages API studio and Anthropic protocol bou
   assert.match(source, /compactForStorage/);
   assert.match(source, /生成下一轮 tool_result 模板/);
   assert.match(source, /consumeAnthropicMessagesStream/);
+  assert.match(source, /className="responses-json-block"/);
+  assert.match(source, /TextEncoder\(\)\.encode\(requestJson\)\.length/);
   assert.match(server, /anthropic-version/);
   assert.match(server, /REQUEST_BODY_FIELDS/);
   assert.match(server, /redactAnthropicMessagesStream/);
