@@ -22,8 +22,14 @@ npm install
 ./start_workbench.sh
 ```
 
-默认地址为 `http://localhost:3001`，按 `Ctrl+C` 停止服务。脚本会检查 Node.js
-版本、端口和项目依赖，但不会自动安装依赖或打开浏览器。
+脚本会在后台启动服务，就绪后输出访问地址、进程 PID 和日志路径；默认地址为
+`http://localhost:3001`，日志写入 `.workbench/run-<端口>.log`。
+
+停止后台服务：
+
+```bash
+./start_workbench.sh --stop
+```
 
 只检查环境：
 
@@ -31,13 +37,15 @@ npm install
 ./start_workbench.sh --check
 ```
 
-临时使用其他端口：
+临时使用其他端口（停止时需保持同一端口）：
 
 ```bash
 SEEDANCE_WORKBENCH_PORT=3100 ./start_workbench.sh
+SEEDANCE_WORKBENCH_PORT=3100 ./start_workbench.sh --stop
 ```
 
-也可直接运行 `npm run dev -- --port 3001`。
+脚本只检查 Node.js 版本、端口和项目依赖，不会自动安装依赖或打开浏览器。
+也可直接运行 `npm run dev -- --port 3001` 在前台调试。
 
 ## 验证
 
