@@ -27,7 +27,7 @@ Responses API 是与 Seedance、模板资产、Seedream 和 Managed Agents 平�
 - OutputItem：message、function call、reasoning、transcription、联网 / 图像 / 知识库 / MCP / 豆包助手 / Agent 工具调用。
 - 流式结果：保留原始 SSE 事件时间线，并同时提取文本 delta 形成可读结果。
 
-简单高频参数由表单编辑；复杂联合结构与新增协议字段可在完整 JSON 编辑器中修改。JSON 解析成功后会立即反映到右侧 Method、URL、Headers 和 Request Body，不维护第二份请求状态。
+简单高频参数由表单编辑；复杂联合结构与新增协议字段可在完整 JSON 编辑器中修改。JSON 解析成功后会立即反映到右侧 Method、URL、Headers 和 Request Body，不维护第二份请求状态。“复制 cURL”会为当前创建、查询、Input Items 或删除操作拼接完整命令；已填写 Key 时剪贴板内容包含该 Key，未填写时保留 `<ARK_API_KEY>` 占位符。
 
 ## 调用链与安全边界
 
@@ -40,6 +40,7 @@ ResponsesWorkbench
 
 - 浏览器不直连火山方舟；服务端目标地址固定，不能由用户改成任意代理。
 - Key 只随同源 POST 临时转发；不得进入 URL、Cookie、SSR、源码、服务端持久化或日志。
+- cURL 只在用户显式点击时于浏览器内生成并写入剪贴板，不进入历史或日志；复制内容需按敏感凭证管理。
 - 创建、查询 Response、查询 Input Items 和删除均通过同一个同源入口；上游 GET / DELETE 的 Key 也不会进入 URL。
 - 未知顶层字段、非法 URL、危险协议、缓存冲突和缺失的工具必填参数在上游调用前拒绝。
 - 真实创建需要 API Key 与费用确认；删除需要单独的不可逆确认。

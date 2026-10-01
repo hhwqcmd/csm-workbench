@@ -13,6 +13,7 @@ import {
   type ResponsesRequestBody,
   type ResponsesScenario,
 } from "../lib/responses-examples";
+import { CopyCurlButton } from "./CopyCurlButton";
 
 type ResponsesAction =
   | "create"
@@ -119,6 +120,16 @@ export function ResponsesWorkbench() {
         trace,
       ),
     [action, apiKey, requestBody, responseId, trace],
+  );
+  const curlApiDetail = useMemo<ApiDetail>(
+    () => ({
+      ...apiDetail,
+      headers: {
+        ...apiDetail.headers,
+        Authorization: `Bearer ${apiKey.trim() || "<ARK_API_KEY>"}`,
+      },
+    }),
+    [apiDetail, apiKey],
   );
   const requestBlocker = getRequestBlocker(requestBody);
   const executeReady =
@@ -524,6 +535,8 @@ export function ResponsesWorkbench() {
                 setApiDraft(requestJson);
                 setApiDraftError("");
               }}
+              curlApiDetail={curlApiDetail}
+              hasApiKey={Boolean(apiKey.trim())}
               edit={() => {
                 setApiDraft(requestJson);
                 setApiEditing(true);
@@ -537,6 +550,19 @@ export function ResponsesWorkbench() {
 
         {action !== "create" && (
           <div className="responses-lifecycle-api">
+            <header className="responses-lifecycle-api-heading">
+              <div>
+                <span>完整 API 详情</span>
+                <strong>当前生命周期操作</strong>
+              </div>
+              <CopyCurlButton
+                body={curlApiDetail.body}
+                containsApiKey={Boolean(apiKey.trim())}
+                headers={curlApiDetail.headers}
+                method={curlApiDetail.method}
+                url={curlApiDetail.url}
+              />
+            </header>
             <ApiSummary detail={apiDetail} />
           </div>
         )}
@@ -1550,7 +1576,9 @@ function ApiEditor({
   apiEditing,
   applyApiDraft,
   cancel,
+  curlApiDetail,
   edit,
+  hasApiKey,
   requestJson,
   setApiDraft,
 }: {
@@ -1560,7 +1588,9 @@ function ApiEditor({
   apiEditing: boolean;
   applyApiDraft: () => void;
   cancel: () => void;
+  curlApiDetail: ApiDetail;
   edit: () => void;
+  hasApiKey: boolean;
   requestJson: string;
   setApiDraft: (value: string) => void;
 }) {
@@ -1571,11 +1601,20 @@ function ApiEditor({
           <span>完整 API 详情</span>
           <strong>表单 ↔ JSON 双向联动</strong>
         </div>
-        {!apiEditing && (
-          <button onClick={edit} type="button">
-            编辑 JSON
-          </button>
-        )}
+        <div className="responses-api-actions">
+          <CopyCurlButton
+            body={curlApiDetail.body}
+            containsApiKey={hasApiKey}
+            headers={curlApiDetail.headers}
+            method={curlApiDetail.method}
+            url={curlApiDetail.url}
+          />
+          {!apiEditing && (
+            <button onClick={edit} type="button">
+              编辑 JSON
+            </button>
+          )}
+        </div>
       </header>
       <ApiSummary detail={apiDetail} />
       <div className="responses-json-block">

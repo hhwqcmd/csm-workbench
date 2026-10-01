@@ -4,6 +4,7 @@ export type WorkspaceView =
   | "seedream"
   | "managed-agents"
   | "responses"
+  | "anthropic-messages"
   | "llm-trends"
   | "ai-coding";
 
