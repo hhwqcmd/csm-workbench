@@ -167,6 +167,94 @@ export async function presignedObjectUrl(objectKeyValue: string): Promise<string
   return presign(config, "GET", objectKey, 3_600);
 }
 
+// ---- Pelican Test archive (demo/pelican/*.json) ----------------------------
+// Reuses the private TOS helpers above. Objects live under demo/pelican/ so the
+// material library (which only lists demo/{video|image|audio}/) never sees them,
+// and no D1 index row is written.
+
+const PELICAN_OBJECT_KEY_PATTERN =
+  /^demo\/pelican\/pel-[0-9]{14}-[a-f0-9]{8}\.json$/;
+const PELICAN_BUNDLE_MAX_BYTES = 2 * 1024 * 1024;
+
+function assertPelicanObjectKey(config: TosConfig, objectKey: string) {
+  assertObjectKey(config, objectKey);
+  if (!PELICAN_OBJECT_KEY_PATTERN.test(objectKey)) {
+    throw new MaterialsValidationError("鹈鹕测试结果对象键格式不正确。");
+  }
+}
+
+export async function savePelicanResultToTos(
+  objectKeyValue: string,
+  bundleJson: string,
+): Promise<{ objectKey: string; size: number }> {
+  const config = tosConfig();
+  const objectKey = requiredString(objectKeyValue, "对象键", 1_024);
+  assertPelicanObjectKey(config, objectKey);
+  if (typeof bundleJson !== "string" || !bundleJson.trim()) {
+    throw new MaterialsValidationError("保存内容不能为空。");
+  }
+  const body = encoder.encode(bundleJson);
+  if (body.byteLength > PELICAN_BUNDLE_MAX_BYTES) {
+    throw new MaterialsValidationError("鹈鹕测试结果超过 2MB 上限。");
+  }
+  await putObject(config, objectKey, body, "application/json");
+  return { objectKey, size: body.byteLength };
+}
+
+export async function presignPelicanResultUrl(
+  objectKeyValue: string,
+): Promise<{ url: string; expiresIn: number }> {
+  const config = tosConfig();
+  const objectKey = requiredString(objectKeyValue, "对象键", 1_024);
+  assertPelicanObjectKey(config, objectKey);
+  const url = await presign(config, "GET", objectKey, 3_600);
+  return { url, expiresIn: 3_600 };
+}
+
+// Server-side read of an archived bundle. Returning the parsed JSON from the
+// same origin avoids the CORS problem of fetching a pre-signed TOS URL directly
+// from the browser. Returns null when the object does not exist (mapped to 404).
+export async function readPelicanResultBundle(
+  objectKeyValue: string,
+): Promise<unknown> {
+  const config = tosConfig();
+  const objectKey = requiredString(objectKeyValue, "对象键", 1_024);
+  assertPelicanObjectKey(config, objectKey);
+  const signed = await signedRequest(config, "GET", objectKey);
+  let response: Response;
+  try {
+    response = await fetch(signed.url, {
+      method: "GET",
+      headers: signed.headers,
+      redirect: "manual",
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch {
+    throw new MaterialsServiceError(
+      "TOS 读取请求未能发送，请稍后重试或联系管理员检查运行环境网络。",
+    );
+  }
+  if (response.status === 404) return null;
+  if (response.status >= 300 && response.status < 400) {
+    throw new MaterialsServiceError("TOS 读取发生重定向，已阻止继续请求。");
+  }
+  if (!response.ok) {
+    const requestId = response.headers.get("x-tos-request-id");
+    throw new MaterialsServiceError(
+      `TOS 读取失败（HTTP ${response.status}${requestId ? `，Request ID ${requestId}` : ""}）。`,
+    );
+  }
+  const text = await response.text();
+  if (text.length > PELICAN_BUNDLE_MAX_BYTES) {
+    throw new MaterialsServiceError("TOS 对象超出 2MB 上限，已拒绝读取。");
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new MaterialsServiceError("TOS 对象不是合法 JSON。");
+  }
+}
+
 export async function verifyCachedMaterialAsset(
   value: unknown,
 ): Promise<MaterialAsset | null> {

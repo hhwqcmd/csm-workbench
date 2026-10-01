@@ -113,9 +113,9 @@ export async function proxyResponses(
     headers,
     body: target.body ? JSON.stringify(target.body) : undefined,
     signal: AbortSignal.timeout(
-      input.action === "create" && input.requestBody.stream
-        ? 300_000
-        : 180_000,
+      // Reasoning models can spend minutes on chain-of-thought before the
+      // visible output, so sync creates get the same headroom as streams.
+      input.action === "create" ? 300_000 : 180_000,
     ),
   });
 

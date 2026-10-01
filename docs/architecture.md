@@ -102,7 +102,7 @@ AI coding 路径
 当前服务端模块负责：
 
 1. 接收浏览器本次手工输入的 Key，但不在服务端持久化、记录或回显。
-2. Seedance 将 API 路径限制为标准 API 与 Agent Plan 两个精确 Base URL；Seedream、Responses API 与 Managed Agents 只允许标准 `/api/v3`；Anthropic Messages 只允许固定 `/api/compatible/v1/messages`，浏览器不能选择 Base URL 或版本头。
+2. Seedance 将 API 路径限制为标准 API 与 Agent Plan 两个精确 Base URL；Seedream、Responses API 与 Managed Agents 只允许标准 `/api/v3`；Anthropic Messages 只允许固定 `/api/compatible/v1/messages`，浏览器不能选择 Base URL 或版本头。LLM 趋势的鹈鹕测试是唯一例外：它走专用 `/api/pelican/responses` create-only 代理，Base URL 由面板手动填写（预填默认标准 `/api/v3`），服务端只放行 HTTP/HTTPS、不含内嵌凭证与查询串的地址；共享 `/api/responses` 代理仍不接受 baseUrl。
 3. 校验模型属于对应路径；Agent Plan 使用套餐别名，标准 API 使用日期版本 Model ID。
 4. 校验通用 `content` 多模态数组、素材 URL、时长、比例、4K 模型限制与联网搜索纯文本限制；标准 API 的 Seedance 2.5 额外校验并转发 `omni_reference_task_type`。
 5. 创建任务并只向浏览器返回必要的任务 ID。
@@ -165,7 +165,7 @@ AI coding 路径
 - Responses API 创建、检索、Input Items 和删除固定在标准 `/api/v3`；真实创建与工具调用需要费用确认，永久删除需要单独确认，页面加载和自动化测试不会产生真实调用。
 - Anthropic Messages API 固定在方舟标准兼容 `/api/compatible/v1/messages`，只使用普通方舟 Key；不开放 Agent Plan、Anthropic 原厂、任意 Base URL 或任意版本头。该接口只有无状态创建，真实调用需要费用确认；页面加载、模板生成、cURL 复制和自动化测试不会产生真实调用。
 - 素材保存、上传和删除是独立显式操作，不会再次调用 Seedance 或 Seedream。素材列表使用服务端 Header 签名，只列举固定 `demo/` 三类前缀，兼容 TOS 原生 JSON 与 XML 响应并与 D1 对账；目录缺项须经 HEAD 404 复核后才能清理索引，旧浏览器缓存也只在服务端 HEAD 校验对象后补写 D1。缺少 `tos:ListBucket` 时列表降级返回 D1/缓存并明确告警；预签名 URL 不持久化。当前仅在本地测试，写入、列举和删除接口仍无应用内身份鉴权并可能产生真实 TOS 费用；固定路径、大小、MIME 与 SSRF 校验只限制请求形态。既有 Sites 版本已限制为仅项目所有者访问，短期内不再更新。
-- LLM 趋势不接收 Key、不调用任何模型或榜单 API；来源链接只在用户主动点击后打开厂商或第三方页面。
+- LLM 趋势的模型对比、benchmark 与榜单均为日期快照数据，不接收 Key、不调用任何模型或榜单 API；来源链接只在用户主动点击后打开厂商或第三方页面。栏目内的“鹈鹕测试”模块是唯一例外：经同源专用 create-only 代理 `/api/pelican/responses` 临时传递普通方舟 Key 后立即转发、Key 不落服务端，Base URL 由面板手动填写（预填默认标准 `/api/v3`）并经服务端校验，仅在用户显式执行且勾选费用确认时发起真实 Responses 创建（生成 + 裁判共 2 次）；SVG→PNG 栅格化仅在浏览器本地完成，PNG 不上传、不持久化、不进入 TOS bundle，交互预览用沙箱 iframe；TOS 归档为显式操作，只写 `demo/pelican/` JSON bundle，不建 D1 索引、不进素材库。页面加载、历史读取与自动化测试零真实调用。
 - AI coding 指标接口只读取代码库中的模拟快照；页面加载只会发起同源只读 GET，不请求外部系统，也不收集开发者、仓库或会话级真实数据。
 - 真实“创建任务”是外部写操作且可能产生费用，不与页面加载或普通测试绑定。
 - 用户素材与 Memory 可能包含隐私或商业信息；Files 上传和 Memory 写入只在用户显式执行时发生，不进入应用服务端持久化或日志以外的副本。浏览器日志仍会记录用户主动提交的脱敏请求体，因此演示时不要使用敏感内容。

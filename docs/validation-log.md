@@ -72,6 +72,24 @@
 - 重试提交后任务创建成功并进入生成中；应用户要求未等待终态，未完成全部 10 个示例的串行运行与保存素材库。
 - 预填链路已验证：模板一键带入完整提示词、10 个私有 TOS 签名素材 URL、16:9、15 秒、有声、有水印，提交前确认摘要与表单一致。
 
+## 2026-09-24：鹈鹕测试视觉裁判单用例
+
+- 在本地 `/#pelican-test` 通过浏览器填写模型并勾选费用确认，只点击一次“开始测试”；使用页面已有标准方舟 Key，不记录凭证明文。
+- 固定 Prompt `Generate an SVG of a pelican riding a bicycle`；生成模型 `deepseek-v4-1-flash-260910`，视觉裁判 `doubao-seed-2-1-pro-260915`。生成 SVG、本地栅格化 PNG、结构化裁判评分均成功。
+- 物种特征 8.5、车架结构 7.0、骑乘姿态 7.5、肢体交互 6.5、SVG 有效性 9.0，均值总分 7.7/10；页面与裁判 JSON 一致。页面合计 usage 为输入 2036、输出 14285 tokens，不代表最终结算账单。
+- 浏览器资源计时记录显示 `/api/responses` 的两次 fetch 均为 HTTP 200；网络工具仅保留其中一次 POST，未完整留存两个 POST 的网络记录。
+- 历史从 0 增至 1 条；刷新后仍在，普通点击历史“查看”后评分与 PNG 恢复。刷新后 `/api/responses` 资源条目为 0，未重复创建计费请求。
+- 本次 PNG 为 100×100、约 11.1 KB，放大预览较模糊；固定导航会遮挡部分 SVG 预览区域，历史“查看”需调整滚动位置后才能点击。这些界面问题未在本次验收中修复。
+- 未执行重评、TOS 保存或读取，也未测试源码裁判。截图：`screenshots/pelican-visual-live-20260924.png`、`screenshots/pelican-visual-history-20260924.png`（不含凭证）。
+
+## 2026-09-26：鹈鹕测试 glm-5-3-flash-260828 截断诊断与修复
+
+- 用户报告 glm-5-3-flash-260828 生成报错。经浏览器实测（用户授权，共三次生成调用；第一次被上游 429 过载拒绝、未消耗 token，退避后重试）定位根因：该模型为推理型，思维链 token 计入 `max_output_tokens`，旧上限 16384 中约 16046 被推理占用，可见输出不足以写出 `</svg>`，`normalizeSvg` 提取失败报“未找到 SVG”。这也解释了 9-24 三次约 140 秒的均匀失败。
+- 修复一：`PELICAN_GENERATION_MAX_TOKENS` 16384→32768，为思维链预留余量；新增 `describeTruncatedGeneration`，当响应为 `incomplete/length` 截断时面板展示含 output_tokens 与 reasoning 占用的显式诊断，而非静默通用错误。
+- 修复二：上限提高后 glm 推理超过代理旧 180 秒中止线（表现为 502 + “The operation was aborted due to timeout”）；`proxyResponses` 非流式 create 超时放宽到与流式一致的 300 秒（其余操作仍 180 秒），route 将 TimeoutError 转为明确中文诊断文案。
+- 修复后实测一次通过：生成完整闭合 SVG（输出 31998/32768，未截断，`response.status` 非 incomplete），视觉裁判 `doubao-seed-2-1-pro-260915` 总分 9.7/10，历史新增 1 条，未触发 300 秒超时。`npm test` 67/67、`npm run lint` 0 警告。
+- 未执行重评、TOS 保存或读取，也未测试源码裁判。截图：`screenshots/pelican-glm-truncated-20260926.png`（截断诊断）、`screenshots/pelican-glm-fixed-20260926.png`（修复后成功，不含凭证）。
+
 ## 记录新验收时
 
 只记录：

@@ -10,7 +10,7 @@
 4. **Responses API**：覆盖文本、多轮、推理、多模态、Function、内置工具、缓存与结构化输出，联动展示完整输入/输出协议、SSE、历史和脱敏日志。
 5. **Messages API**：只接方舟标准 Anthropic 兼容入口，覆盖无状态多轮、Prefill、thinking/signature、多模态、客户端 Tool Use/tool_result、Prompt Caching、同步/SSE、历史与脱敏日志。
 6. **Managed Agents**：创建或更新 Agent、配置 Agent 环境，并统一管理 Session 生命周期、事件流、文件挂载与持久化记忆。
-7. **LLM 趋势**：以日期快照展示 Seed、Seedance、Seedream 主力模型，并对比各厂商最新文本旗舰的价格、参数、编程、长程、Agent benchmark 与第三方榜单。
+7. **LLM 趋势**：以日期快照展示 Seed、Seedance、Seedream 主力模型，并对比各厂商最新文本旗舰的价格、参数、编程、长程、Agent benchmark 与第三方榜单。快照数据纯静态、不调用任何模型；栏目内新增“鹈鹕测试”交互模块（`PelicanTestPanel`），用固定 Prompt 生成 SVG 并由视觉 / 源码双裁判评分，仅在用户显式执行并确认费用时真实调用。
 8. **AI coding**：以存量接口变更为贯穿案例，演示“规格 → 知识 → 计划 → 护栏执行 → 验收 → 回流”的企业 AI coding 闭环；四个承载栏目仍为 Agent 资产管理、项目资产、代码质量门禁与模拟组织效能指标，不绑定具体产品。
 
 官方 Python 快速示例作为协议和素材基线独立保留，不是产品页面主线。页面不得重新加入共学进度、环境安装步骤或教程路线。
@@ -38,7 +38,13 @@
 - `app/components/AnthropicMessagesWorkbench.tsx`：Messages 八类场景、通用 stream 开关、表单/JSON/cURL、同步结果、完整 SSE 时间线与 Message 聚合、tool_result 模板、历史和脱敏日志。
 - `app/lib/anthropic-messages-examples.ts`、`app/lib/anthropic-messages-server.ts`、`app/lib/anthropic-messages-stream.ts`、`app/api/anthropic-messages/route.ts`：兼容协议示例、固定 URL/版本头、请求白名单与安全校验、跨 chunk 脱敏、SSE 聚合和同源创建入口。
 - `app/components/ManagedAgentsWorkbench.tsx`：Managed Agents 三步表单；第 3 步含 Session 生命周期、事件、Files/Resources、TOS 与 Memory Store/Memory 管理；三步都展示完整 API 与响应，并负责资源 ID、SSE、历史与日志。
-- `app/components/LlmTrendsWorkbench.tsx`：Seed / Seedance / Seedream 与同赛道型号对比表、九项单项 benchmark、Arena / Artificial Analysis 快照与来源台账；纯静态展示，不调用任何模型。
+- `app/components/LlmTrendsWorkbench.tsx`：Seed / Seedance / Seedream 与同赛道型号对比表、九项单项 benchmark、Arena / Artificial Analysis 快照与来源台账；快照部分纯静态展示、不调用任何模型，并内嵌下方“鹈鹕测试”交互面板。
+- `app/components/PelicanTestPanel.tsx`：LLM 趋势“鹈鹕测试”交互面板——固定 Prompt 生成 SVG、视觉 / 源码双裁判评分、五维得分与时间序列历史、显式保存到 TOS；页面加载零真实调用。
+- `app/lib/pelican-shared.ts`：客户端与服务端共用的鹈鹕测试契约（固定 Prompt、五维 json_schema、裁判 Prompt 与多模态输入拼装、SVG 归一化、历史 / 对象键常量），不含 `server-only`。
+- `app/lib/pelican-render.ts`：纯浏览器本地 SVG→PNG 栅格化（`canvas.toDataURL`），含 900KB data URL 守卫、512 降采样重试与 10 秒超时；不得被 `server-only` 模块导入。
+- `app/lib/pelican-server.ts`：鹈鹕测试服务端校验（`server-only`），字段 / 尺寸 / 分数范围校验并递归拒绝敏感键。
+- `app/lib/pelican-responses-server.ts`、`app/api/pelican/responses/route.ts`：鹈鹕测试专用 create-only Responses 代理（`server-only`）——Base URL 由面板手动填写（默认标准 `/api/v3`），服务端校验协议 / 凭证 / 查询串后转发，固定 `store:false`、`stream:false`、600 秒超时并脱敏 Key；共享 `/api/responses` 代理保持固定上游不变。
+- `app/api/pelican/tos/route.ts`：鹈鹕测试结果 JSON bundle 的同源 TOS 保存（POST 201）与预签名 / 内容读取（GET）入口，仅 `demo/pelican/` 前缀。
 - `app/components/AiCodingWorkbench.tsx`：产品中立的六步交付演示、Agent 执行护栏、分层知识生命周期、规格驱动质量门禁、任务后学习闭环、18 个可复制生产模板及模拟组织指标；仅效能区展示模拟数据。
 - `app/lib/ai-coding-data.ts`、`app/api/ai-coding/metrics/route.ts`：模拟组织、团队与指标快照，以及只读同源指标接口；不接入真实研发数据平台。
 - `app/lib/managed-agents-server.ts`：Managed Agents 标准 Base URL、Agent/环境/Session/文件/Memory 全字段校验、生命周期代理与 SSE 转发。
@@ -51,7 +57,7 @@
 - `app/lib/material-assets.ts`、`app/lib/materials-server.ts`、`app/lib/material-index-server.ts`、`app/api/materials/`：素材元数据契约、本地缓存、D1 持久索引、固定 TOS 配置、TOS4 签名、历史恢复、上传、临时预览、改名和同步删除。
 - `app/globals.css`、`app/layout.tsx`：视觉规则、响应式布局和站点元数据。
 - `official-quickstart/`：官方 Python 基线；关键入口为 `python/demo_standard.py`。
-- `start_workbench.sh`：本地启动与环境检查，不安装依赖、不打开浏览器、不调用真实 API。
+- `start_workbench.sh`：本地启动与环境检查，默认后台运行并输出访问地址、PID 与日志路径（`.workbench/`），支持 `--stop`；不安装依赖、不打开浏览器、不调用真实 API。
 - `worker/`、`build/`、`vite.config.ts`：vinext/Cloudflare Worker 适配层。
 - `db/`、`drizzle/`：Seedream 短期后台任务与素材长期索引的 D1 schema 和迁移；`examples/d1/` 仍为样例。
 - `tests/rendered-html.test.mjs`：页面契约、服务端边界和安全回归测试。
@@ -63,6 +69,8 @@
 `ManagedAgentsWorkbench → /api/managed-agents/* → managed-agents-server → 火山方舟 Managed Agents API`
 
 `ResponsesWorkbench → /api/responses → responses-server → 火山方舟 Responses API`
+
+`PelicanTestPanel → /api/pelican/responses（生成 + 裁判，Base URL 手动填写）与 /api/pelican/tos → materials-server → 私有 TOS demo/pelican/ JSON bundle`
 
 `AnthropicMessagesWorkbench → /api/anthropic-messages → anthropic-messages-server → 方舟 Anthropic 兼容 /v1/messages`
 
@@ -118,6 +126,12 @@
 - AI coding 栏目只使用仓库内模拟组织与指标数据；同源 GET 接口不得接入员工身份、真实代码内容、会话 Prompt、凭证或生产效能平台。页面不得把模拟数据表述为真实客户成效。
 - Responses 创建必须费用确认，永久删除必须不可逆确认；缓存要求 `store=true`，前缀缓存还要求 `stream=false`，且缓存不能与非 Function 内置工具混用。
 - Responses 历史最多保留 30 条并仅存当前浏览器；Authorization、MCP headers、Token、Secret 与 Password 必须脱敏。自动化测试只允许模拟上游。
+- LLM 趋势的鹈鹕测试是唯一交互模块，使用固定 Prompt `Generate an SVG of a pelican riding a bicycle`（逐字，社区非正式基准），生成与裁判都经专用 `/api/pelican/responses` 同源 create-only 代理与普通方舟 Key，固定 `store:false`、`stream:false`；Base URL 由面板手动填写（预填默认标准 `/api/v3`），服务端只放行 HTTP/HTTPS、不含内嵌凭证与查询串的地址；共享 `/api/responses` 代理不开放 baseUrl，浏览器请求包仍只含 `{ apiKey, trace, requestBody }`。
+- 每次鹈鹕测试含 2 次真实 Responses 创建（生成 + 裁判），视觉裁判另含图像 token，TOS 保存另产生存储与流量费用；必须先勾选费用确认，字段不全或未确认时“开始测试”禁用。页面加载、历史读取与自动化测试零真实调用。
+- 视觉裁判（默认）在浏览器本地把 SVG 栅格化为 PNG 并以 `input_image` data URL 送多模态裁判模型，裁判模型必须具备图像理解能力；源码裁判把 SVG 源码作为文本送任意文本模型。两模式共用同一 json_schema 但 `svgValidity` 口径不同，历史记录标注模式且不做跨模式排名。
+- SVG→PNG 栅格化仅在浏览器本地完成（`canvas.toDataURL`）；受鹈鹕专用代理单字符串 ≤1MB 限制，data URL >900KB 时以 512 降采样重渲一次，仍超限则中止并提示改用源码裁判。PNG 不上传、不持久化、不进入 TOS bundle，仅记录 `renderMeta`。
+- 鹈鹕测试历史最多 30 条且仅存当前浏览器 localStorage，不保存 API Key；TOS 归档为显式操作，只写 `demo/pelican/{runId}.json` JSON bundle（≤2MB），不建 D1 索引、不进素材库列举。
+- SVG 交互预览必须用沙箱 iframe（`sandbox` + `srcDoc`）杜绝脚本执行；服务端保存前递归拒绝任何 `apiKey/authorization/token/secret/password` 等敏感键，`inputTokens`/`outputTokens` 计数键放行。
 - Anthropic Messages API 固定使用 `https://ark.cn-beijing.volces.com/api/compatible/v1/messages`、普通方舟 Key 与 `anthropic-version: 2023-06-01`。浏览器请求包只能包含 `{ apiKey, trace, requestBody }`，不得开放 Base URL、版本头、Anthropic 原厂或 Agent Plan 配置。
 - Anthropic Messages 可执行字段仅限服务端白名单；`output_config`、container/skills、Anthropic Server Tools、`inference_geo` 等只读参考不得透传。消息 role、内容块、HTTPS/Base64 素材、tool_use/tool_result ID、thinking budget/signature、缓存结构、JSON 深度和危险对象键必须在服务端校验。
 - Anthropic Messages 只有无状态创建，不增加查询或删除；真实创建必须费用确认。历史独立保留最多 30 条，不保存 Key，Base64 内容必须压缩；同步与跨 chunk SSE 在返回浏览器前均须脱敏。工具回传按钮只生成模板，不得执行真实工具；自动化测试只使用模拟上游。

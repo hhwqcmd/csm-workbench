@@ -234,6 +234,7 @@ test("keeps the eight-studio shell compact and anchor-safe across breakpoints", 
   assert.doesNotMatch(source, /"#flagship-matrix"/);
   assert.match(source, /"#benchmark-lens"/);
   assert.match(source, /"#leaderboards"/);
+  assert.match(source, /"#pelican-test"/);
   assert.match(source, /"#anthropic-editor"/);
   assert.match(source, /"#anthropic-schema"/);
   assert.match(styles, /body\s*\{[^}]*overflow-x: clip/s);
@@ -417,6 +418,22 @@ test("server-renders the LLM trends research snapshot without live API work", as
     source.indexOf("const TEXT_MODELS"),
     source.indexOf("const OPUS_46_REFERENCE"),
   );
+  const textTrackSource = source.slice(
+    source.indexOf('id: "text"'),
+    source.indexOf('id: "video"'),
+  );
+  const benchmarkModelNames = [
+    ...benchmarkModelsSource.matchAll(/\bmodel:\s*"([^"]+)"/g),
+  ].map((match) => match[1]);
+  const comparisonModelNames = [
+    ...textTrackSource.matchAll(/\bmodel:\s*"([^"]+)"/g),
+  ].map((match) => match[1]);
+  const benchmarkModelBlock = (model) => {
+    const start = benchmarkModelsSource.indexOf(`model: "${model}"`);
+    assert.notEqual(start, -1, `${model} should exist in benchmark models`);
+    const next = benchmarkModelsSource.indexOf("\n  {", start);
+    return benchmarkModelsSource.slice(start, next === -1 ? undefined : next);
+  };
   const leaderboardSource = await readFile(
     new URL("../app/lib/llm-leaderboards.ts", import.meta.url),
     "utf8",
@@ -427,8 +444,11 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.ok(leaderboardJson);
   const leaderboardRows = JSON.parse(leaderboardJson[1]);
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const refreshedTrendStyles = styles.slice(
+    styles.indexOf("/* LLM Trends 2026-08-31: evidence-first research workspace. */"),
+  );
 
-  assert.match(html, /MARKET SNAPSHOT · 2026\.08\.25/);
+  assert.match(html, /2026\.09\.30 \/ STATIC RESEARCH SNAPSHOT/);
   assert.match(html, /LLM/);
   assert.match(html, /第三方测评/);
   assert.doesNotMatch(html, /文本模型 Benchmark/);
@@ -445,16 +465,36 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.doesNotMatch(html, /COMPETITOR SET/);
   for (const model of [
     "Claude Fable 5",
+    "Claude Fable 5.1",
+    "Claude Mythos 5.1",
+    "Claude Opus 5",
+    "Claude Opus 5.5",
+    "Claude Sonnet 5",
+    "Claude Sonnet 5.5",
+    "GPT-6 Astra",
+    "GPT-6.1 Sol",
+    "GPT-6 Sol",
+    "GPT-6 Luna",
     "GPT-5.6 Sol",
+    "GPT-5.6 Terra",
+    "GPT-5.6 Luna",
+    "Hy4 preview",
     "Qwen3.8-Max",
+    "Qwen3.8-Flash",
     "Qwen3.8-27B",
+    "Step 5 Preview",
+    "MiMo-V2.6-Pro",
+    "MiMo-V2.6-Flash",
     "Kimi K3",
     "GLM-5.3",
-    "GLM-5.2",
+    "GLM-5.3-Flash",
+    "DeepSeek-V4.1-Flash",
     "DeepSeek-V4-Pro-0813",
     "DeepSeek-V4-Flash-0731",
     "Grok 4.6",
-    "MiniMax M3",
+    "Grok 4.7",
+    "Muse Spark 1.3",
+    "Gemini 3.8 Flash",
   ]) {
     assert.match(html, new RegExp(model.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -463,7 +503,10 @@ test("server-renders the LLM trends research snapshot without live API work", as
     "Claude Sonnet 5",
     "GPT-5.6 Terra",
     "GPT-5.6 Luna",
-    "Qwen3.7-Plus",
+    "Hy4 preview",
+    "Qwen3.8-Flash",
+    "Qwen3.8-27B",
+    "GLM-5.3-Flash",
     "DeepSeek-V4-Pro-0813",
     "DeepSeek-V4-Flash-0731",
     "Grok 4.6",
@@ -481,6 +524,44 @@ test("server-renders the LLM trends research snapshot without live API work", as
   ]) {
     assert.match(source, new RegExp(model.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.doesNotMatch(source, /model: "Qwen3\.7-Plus"/);
+  assert.doesNotMatch(source, /model: "Qwen3\.8-Flash-Next"/);
+  assert.doesNotMatch(source, /model: "GLM-5\.2"/);
+  assert.doesNotMatch(source, /model: "MiniMax M3"/);
+  assert.doesNotMatch(source, /QWEN_38_FLASH_NEXT_METRICS/);
+  assert.equal(new Set(benchmarkModelNames).size, benchmarkModelNames.length);
+  assert.equal(new Set(comparisonModelNames).size, comparisonModelNames.length);
+  assert.equal(benchmarkModelNames.length, 33);
+  assert.deepEqual(
+    [...benchmarkModelNames].sort(),
+    [...comparisonModelNames].sort(),
+    "single-benchmark models must match the text comparison list exactly",
+  );
+  assert.equal(benchmarkModelNames.includes("Claude Opus 4.6"), false);
+  assert.match(html, /<dt>33<\/dt><dd>文本模型<\/dd>/);
+  assert.match(html, /<dt>13<\/dt><dd>单项基准<\/dd>/);
+  assert.match(source, /<th>成本估算<\/th>/);
+  assert.match(source, /95:4:1 混合 \/ 百万 tokens/);
+  assert.match(source, /成本估算按 cache input : 非缓存输入 : 输出 = 95 : 4 : 1 混合/);
+  for (const [model, cost] of [
+    ["Claude Opus 5.5", "$0.55"],
+    ["Claude Mythos 5.1", "$1.1375"],
+    ["Claude Sonnet 5.5", "$0.37"],
+    ["GPT-6.1 Sol", "$0.275"],
+    ["GPT-6 Luna", "$0.0185"],
+    ["MiMo-V2.6-Pro", "¥0.20375"],
+    ["MiMo-V2.6-Flash", "¥0.079"],
+    ["Step 5 Preview", "¥0.8125"],
+    ["GLM-5.3", "¥2.5"],
+    ["Kimi K3", "¥3.7"],
+  ]) {
+    assert.ok(
+      benchmarkModelBlock(model).includes(`estimatedCost: "${cost}"`),
+      `${model} should publish the 95:4:1 blended cost estimate`,
+    );
+  }
+  assert.match(source, /className="trends-snapshot-panel"/);
+  assert.doesNotMatch(source, /trends-live-dot|trends-radar-orbit|trends-score-track/);
   assert.match(
     source,
     /model: "Doubao-Seedream-5\.0-Pro",[\s\S]*?price: "¥0\.30 \/ ¥0\.60",[\s\S]*?priceNote: "≤2\.36MP \/ >2\.36MP · 每张"/,
@@ -526,12 +607,16 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.doesNotMatch(source, /className="trend-competitor-grid"/);
   assert.match(styles, /\.trend-compare-button\s*\{/);
   assert.match(styles, /\.trend-track-expansion\s*\{/);
-  assert.match(styles, /\.trend-model-comparison-table\s*\{[^}]*min-width: 1080px/s);
+  assert.match(styles, /\.trend-model-comparison-table\s*\{[^}]*min-width: 1200px/s);
   for (const benchmark of [
     "NL2Repo-Bench",
+    "HLE with Tools",
+    "GDPval-AA v2.1",
+    "Terminal-Bench 4.0",
     "Terminal-Bench 3.0",
     "Terminal-Bench 2.1",
     "SWE Pro",
+    "FrontierSWE v2",
     "Agents’ Last Exam (ALE)",
     "MCP-Atlas",
     "DeepSWE",
@@ -540,54 +625,210 @@ test("server-renders the LLM trends research snapshot without live API work", as
   ]) {
     assert.match(html, new RegExp(benchmark.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.doesNotMatch(source, /id: "gdpval"/);
-  assert.doesNotMatch(source, /label: "GDPval"/);
+  assert.match(source, /id: "hleTools"/);
+  assert.match(source, /id: "gdpvalAaV2"/);
+  assert.match(source, /id: "terminal4"/);
+  assert.match(source, /id: "frontierSwe"/);
+  assert.match(source, /label: "FrontierSWE v2"/);
+  assert.match(source, /label: "GDPval-AA v2\.1"/);
   assert.doesNotMatch(source, /id: "sciCode"/);
   assert.doesNotMatch(source, /label: "SciCode"/);
   assert.match(source, /id: "terminal3"/);
   assert.match(source, /id: "deepSwe"/);
-  assert.match(source, /113 项长程软件工程任务；3 次运行平均 pass@1/);
-  assert.match(source, /value: "72\.7%"[\s\S]*?OpenAI 官方发布 · DeepSWE v1\.1 \/ max/);
-  assert.match(source, /value: "69\.7%"[\s\S]*?Anthropic 系统卡 · DeepSWE v1\.1 \/ max/);
-  assert.match(source, /value: "67\.5%"[\s\S]*?Kimi 官方模型卡 · Kimi Code \/ max/);
+  assert.match(source, /113 项长程软件工程任务/);
+  assert.match(source, /value: "73%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ max/);
+  assert.match(source, /value: "70%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ xhigh/);
+  assert.match(source, /value: "69%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ max/);
+  assert.match(benchmarkModelsSource, /model: "Doubao-Seed-2\.1-Turbo"/);
   assert.match(benchmarkModelsSource, /model: "Claude Opus 5"/);
+  assert.match(benchmarkModelsSource, /model: "Claude Sonnet 5"/);
+  assert.match(benchmarkModelsSource, /model: "GPT-5\.6 Terra"/);
+  assert.match(benchmarkModelsSource, /model: "GPT-5\.6 Luna"/);
+  assert.match(benchmarkModelsSource, /model: "Hy4 preview"/);
+  assert.match(benchmarkModelsSource, /model: "Qwen3\.8-Flash"/);
   assert.match(benchmarkModelsSource, /model: "Qwen3\.8-27B"/);
+  assert.match(benchmarkModelsSource, /model: "GLM-5\.3-Flash"/);
   assert.doesNotMatch(benchmarkModelsSource, /model: "GLM-5\.2"/);
   assert.doesNotMatch(benchmarkModelsSource, /model: "MiniMax M3"/);
+  assert.match(
+    benchmarkModelsSource,
+    /model: "Claude Opus 5"[\s\S]*?HLE_TOOLS\([\s\S]*?64\.7[\s\S]*?GDPVAL_AA\(1708, "adaptive \/ max", 25\)[\s\S]*?TERMINAL_4\(51\.8, "Claude Code 2\.1\.231 \/ max", 3\.4\)/,
+  );
+  assert.match(
+    benchmarkModelsSource,
+    /model: "GLM-5\.3"[\s\S]*?HLE_TOOLS\([\s\S]*?62\.5[\s\S]*?GDPVAL_AA\(1646, "max", 25\)[\s\S]*?TERMINAL_4\(41\.8, "Claude Code 2\.1\.207 \/ max", 3\.2\)/,
+  );
+  assert.match(
+    benchmarkModelsSource,
+    /model: "Qwen3\.8-27B"[\s\S]*?gdpvalAaV2: GDPVAL_AA\(1409, "xhigh", 26\)/,
+  );
+  assert.match(
+    source,
+    /model: "Claude Opus 4\.6"[\s\S]*?HLE_TOOLS\([\s\S]*?53[\s\S]*?adaptive max \/ 3M 累计上下文/,
+  );
+  for (const [model, score] of [
+    ["Claude Fable 5", 63.9],
+    ["Claude Fable 5.1", 65.0],
+    ["Claude Opus 5", 64.7],
+    ["Claude Opus 5.5", 67.7],
+    ["Claude Sonnet 5", 57.4],
+    ["GPT-6 Astra", 57.2],
+    ["GPT-5.6 Sol", 58],
+    ["Hy4 preview", 55.4],
+    ["Qwen3.8-Max", 56.2],
+    ["Step 5 Preview", 59.4],
+    ["Kimi K3", 56],
+    ["GLM-5.3", 62.5],
+    ["GLM-5.3-Flash", 55.3],
+    ["DeepSeek-V4-Pro-0813", 60],
+    ["DeepSeek-V4-Flash-0731", 51.5],
+    ["Muse Spark 1.3", 49.1],
+    ["Gemini 3.8 Flash", 47.8],
+  ]) {
+    assert.match(benchmarkModelBlock(model), new RegExp(`HLE_TOOLS\\(\\s*${String(score).replace(".", "\\.")}`));
+  }
+  for (const [model, score] of [
+    ["Claude Fable 5", 1595],
+    ["Claude Fable 5.1", 1735],
+    ["Claude Opus 5", 1708],
+    ["Claude Opus 5.5", 1846],
+    ["Claude Sonnet 5", 1449],
+    ["GPT-6 Astra", 1542],
+    ["GPT-6 Sol", 1487],
+    ["GPT-6 Luna", 1367],
+    ["GPT-5.6 Sol", 1588],
+    ["GPT-5.6 Terra", 1432],
+    ["GPT-5.6 Luna", 1443],
+    ["Qwen3.8-Max", 1668],
+    ["Qwen3.8-27B", 1409],
+    ["Step 5 Preview", 1566],
+    ["MiMo-V2.6-Pro", 1673],
+    ["Kimi K3", 1524],
+    ["GLM-5.3", 1646],
+    ["GLM-5.3-Flash", 1641],
+    ["DeepSeek-V4.1-Flash", 1600],
+    ["DeepSeek-V4-Pro-0813", 1441],
+    ["DeepSeek-V4-Flash-0731", 1427],
+    ["Grok 4.6", 1632],
+    ["Grok 4.7", 1695],
+    ["Muse Spark 1.3", 1674],
+    ["Gemini 3.8 Flash", 1412],
+  ]) {
+    assert.match(benchmarkModelBlock(model), new RegExp(`GDPVAL_AA\\(${score},`));
+  }
+  for (const [model, score] of [
+    ["GPT-6 Astra", 58.2],
+    ["Claude Fable 5", 44.5],
+    ["Claude Fable 5.1", 57.9],
+    ["Claude Opus 5", 51.8],
+    ["Claude Sonnet 5", 12.4],
+    ["GPT-5.6 Sol", 37.3],
+    ["GPT-5.6 Terra", 21.5],
+    ["GPT-5.6 Luna", 17.3],
+    ["GLM-5.3", 41.8],
+    ["Grok 4.6", 20.3],
+    ["Gemini 3.8 Flash", 19.1],
+  ]) {
+    assert.match(benchmarkModelBlock(model), new RegExp(`TERMINAL_4\\(${String(score).replace(".", "\\.")},`));
+  }
+  assert.match(
+    benchmarkModelBlock("Claude Opus 5.5"),
+    /terminal4: \{[\s\S]*?value: "66\.4%"[\s\S]*?生产护栏启用/,
+  );
+  assert.match(
+    benchmarkModelBlock("Claude Opus 5.5"),
+    /osWorld: \{[\s\S]*?value: "81\.8%"[\s\S]*?Anthropic 官方 · OSWorld 2\.0 \/ partial/,
+  );
+  assert.match(
+    benchmarkModelBlock("Grok 4.7"),
+    /terminal4: \{[\s\S]*?value: "37\.6%"[\s\S]*?xAI 官方 · Terminal-Bench 4\.0 \/ xhigh/,
+  );
+  assert.match(
+    benchmarkModelBlock("Grok 4.7"),
+    /deepSwe: \{[\s\S]*?value: "71\.0%"[\s\S]*?xAI 官方 · DeepSWE v1\.1 \/ high/,
+  );
+  assert.match(
+    benchmarkModelBlock("Step 5 Preview"),
+    /terminal4: \{[\s\S]*?value: "33\.3%"[\s\S]*?阶跃官方 · Terminal-Bench 4\.0 \/ harness 未披露/,
+  );
+  assert.match(
+    benchmarkModelBlock("Step 5 Preview"),
+    /deepSwe: \{[\s\S]*?value: "67\.7%"[\s\S]*?阶跃官方 · DeepSWE v1\.1/,
+  );
+  assert.match(
+    benchmarkModelBlock("MiMo-V2.6-Pro"),
+    /deepSwe: \{[\s\S]*?value: "72\.6%"[\s\S]*?小米官方 · DeepSWE v1\.1 \/ RL 后/,
+  );
+  assert.match(benchmarkModelBlock("MiMo-V2.6-Flash"), /deepSwe: \{[\s\S]*?value: "65\.7%"/);
   assert.match(source, /model: "DeepSeek-V4-Flash-0731"[\s\S]*?value: "54\.2%"[\s\S]*?DeepSeek Harness 极简模式 \/ max/);
   assert.match(source, /value: "82\.7%"[\s\S]*?DeepSeek 官方 · DeepSeek Harness 极简模式 \/ max/);
   assert.match(source, /value: "25\.2%"[\s\S]*?Agent Last Exam \/ Agent 框架未单独披露/);
-  assert.match(source, /value: "54\.4%"[\s\S]*?DeepSeek 官方 · DeepSeek Harness 极简模式 \/ max/);
-  assert.match(source, /model: "DeepSeek-V4-Flash-0731"[\s\S]*?price: "¥1 \/ ¥2"/);
+  assert.match(source, /value: "53%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ max/);
+  assert.match(source, /model: "DeepSeek-V4-Flash-0731"[\s\S]*?price: "¥2 \/ ¥8"/);
   assert.match(
     benchmarkModelsSource,
-    /model: "DeepSeek-V4-Pro-0813"[\s\S]*?price: "¥3 \/ ¥6"[\s\S]*?value: "61\.5%"[\s\S]*?DeepSeek Harness \/ max[\s\S]*?Terminal-Bench 3\.0 官方榜未收录 DeepSeek-V4-Pro-0813[\s\S]*?value: "25\.7%"[\s\S]*?value: "87\.9%"[\s\S]*?value: "62\.7%"[\s\S]*?DeepSWE 1\.1 \/ DeepSeek Harness \/ max/,
+    /model: "DeepSeek-V4-Pro-0813"[\s\S]*?price: "¥9 \/ ¥27"[\s\S]*?value: "61\.5%"[\s\S]*?DeepSeek Harness \/ max[\s\S]*?Terminal-Bench 3\.0 官方榜未收录 DeepSeek-V4-Pro-0813[\s\S]*?value: "25\.7%"[\s\S]*?value: "87\.9%"[\s\S]*?value: "63%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ max/,
   );
   assert.match(
     source,
-    /model: "Grok 4\.6"[\s\S]*?price: "\$2 \/ \$6"[\s\S]*?value: "26\.5%"[\s\S]*?Terminal-Bench 3\.0 官方榜 · Grok Build \/ high[\s\S]*?value: "88\.4%"[\s\S]*?Terminal-Bench 2\.1 \/ high[\s\S]*?value: "65\.9%"[\s\S]*?SpaceXAI 官方 · DeepSWE v1\.1 \/ high/,
+    /model: "Grok 4\.6"[\s\S]*?price: "\$2 \/ \$6"[\s\S]*?value: "26\.5%"[\s\S]*?Terminal-Bench 3\.0 官方榜 · Grok Build \/ high[\s\S]*?value: "88\.4%"[\s\S]*?Terminal-Bench 2\.1 \/ high[\s\S]*?value: "67%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ medium/,
   );
   assert.match(
     source,
-    /model: "GLM-5\.3"[\s\S]*?price: "未披露"[\s\S]*?value: "58\.0%"[\s\S]*?GLM 官方发布 · 1M context[\s\S]*?value: "28\.3%"[\s\S]*?Claude Code 2\.1\.207 \/ max \/ avg@3[\s\S]*?value: "88\.2%"[\s\S]*?Claude Code 2\.1\.207 \/ max[\s\S]*?value: "28\.5%"[\s\S]*?ALE-CLI \/ Claude Code \/ max[\s\S]*?value: "66\.9%"[\s\S]*?DeepSWE v1\.1 \/ mini-swe-agent/,
+    /model: "GLM-5\.3"[\s\S]*?price: "¥8 \/ ¥28"[\s\S]*?value: "58\.0%"[\s\S]*?GLM 官方发布 · 1M context[\s\S]*?value: "28\.3%"[\s\S]*?Claude Code 2\.1\.207 \/ max \/ avg@3[\s\S]*?value: "88\.2%"[\s\S]*?Claude Code 2\.1\.207 \/ max[\s\S]*?value: "28\.5%"[\s\S]*?ALE-CLI \/ Claude Code \/ max[\s\S]*?value: "69%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ max/,
+  );
+  assert.match(
+    benchmarkModelsSource,
+    /model: "Hy4 preview"[\s\S]*?price: "¥6 \/ ¥18"[\s\S]*?parameters: "770B \/ 49B 激活"[\s\S]*?value: "58\.9%"[\s\S]*?value: "85\.4%"[\s\S]*?value: "65\.7%"[\s\S]*?SWE-bench Pro \/ swe-agent[\s\S]*?value: "22\.8%"[\s\S]*?value: "83\.7%"[\s\S]*?value: "64\.3%"/,
+  );
+  assert.match(
+    benchmarkModelsSource,
+    /model: "Qwen3\.8-Flash"[\s\S]*?price: "¥0\.8 \/ ¥2\.7"[\s\S]*?parameters: "未独立披露"[\s\S]*?metrics: UNSCORED_METRICS/,
+  );
+  assert.match(
+    benchmarkModelsSource,
+    /model: "GLM-5\.3-Flash"[\s\S]*?release: "2026\.08\.31"[\s\S]*?price: "¥0\.8 \/ ¥2\.8"[\s\S]*?priceNote: "智谱开放平台中国区牌价输入 \/ 输出；限时折扣不进主值"[\s\S]*?parameters: "320B \/ 18B 激活"[\s\S]*?value: "56\.3%"[\s\S]*?value: "84\.3%"[\s\S]*?Claude Code 2\.1\.207 \/ max[\s\S]*?value: "26\.3%"[\s\S]*?value: "63%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ max/,
   );
   assert.match(source, /model: "Kimi K3"[\s\S]*?value: "17\.4%"[\s\S]*?GLM 官方发布交叉表 · Claude Code \/ max/);
   assert.match(source, /model: "GPT-5\.6 Sol"[\s\S]*?value: "34\.6%"[\s\S]*?Terminal-Bench 3\.0 官方榜 · Codex \/ max/);
   assert.match(source, /model: "Claude Fable 5"[\s\S]*?value: "34\.1%"[\s\S]*?Terminal-Bench 3\.0 官方榜 · Claude Code \/ max/);
   assert.match(
     benchmarkModelsSource,
-    /model: "Claude Opus 5"[\s\S]*?value: "42\.7%"[\s\S]*?mini-SWE-agent \/ max[\s\S]*?value: "27\.0%"[\s\S]*?Claude Code \/ max[\s\S]*?value: "89\.1%"[\s\S]*?Terminal-Bench 2\.1 \/ max[\s\S]*?value: "85\.8%"[\s\S]*?value: "79\.2%"[\s\S]*?adaptive thinking \/ max[\s\S]*?value: "68\.8%"[\s\S]*?DeepSWE v1\.1 \/ max[\s\S]*?value: "70\.6%"[\s\S]*?OSWorld 2\.0 \/ max/,
+    /model: "Claude Opus 5"[\s\S]*?value: "42\.7%"[\s\S]*?mini-SWE-agent \/ max[\s\S]*?value: "31\.6%"[\s\S]*?ALE 官方榜 · Claude Code \/ high[\s\S]*?value: "89\.1%"[\s\S]*?Terminal-Bench 2\.1 \/ max[\s\S]*?value: "85\.8%"[\s\S]*?value: "79\.2%"[\s\S]*?adaptive thinking \/ max[\s\S]*?value: "74%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ max[\s\S]*?value: "70\.6%"[\s\S]*?OSWorld 2\.0 \/ max/,
   );
   assert.match(
     benchmarkModelsSource,
     /model: "Qwen3\.8-27B"[\s\S]*?parameters: "27B"[\s\S]*?value: "42\.3%"[\s\S]*?Qwen 官方模型卡 · Claude Code[\s\S]*?value: "20\.4%"[\s\S]*?Claude Code \/ max[\s\S]*?value: "73\.0%"[\s\S]*?Qwen 官方模型卡 · Terminus[\s\S]*?value: "61\.7%"[\s\S]*?Claude Code \/ 256K[\s\S]*?value: "42\.2%"[\s\S]*?DeepSWE 1\.1 \/ Claude Code \/ 256K[\s\S]*?value: "84\.3%"[\s\S]*?OSWorld-Verified/,
   );
-  assert.match(benchmarkModelsSource, /model: "Doubao-Seed-2\.1-Pro"[\s\S]*?value: "19\.1%"[\s\S]*?ALE 官方榜 · Claude Code/);
+  assert.match(benchmarkModelsSource, /model: "Doubao-Seed-2\.1-Pro"[\s\S]*?value: "19\.5%"[\s\S]*?ALE 官方榜 · Claude Code/);
   assert.match(benchmarkModelsSource, /model: "GPT-5\.6 Sol"[\s\S]*?value: "30\.6%"[\s\S]*?ALE 官方榜 · Codex \/ xhigh/);
+  for (const [model, benchmark, score, slug] of [
+    ["Doubao-Seed-2.1-Turbo", "swePro", 57, "swe-bench-pro"],
+    ["Doubao-Seed-2.1-Turbo", "osWorld", 76.4, "osworld"],
+    ["Doubao-Seed-2.1-Turbo", "mmmuPro", 82.2, "mmmu-pro"],
+    ["Claude Sonnet 5", "swePro", 63.2, "swe-bench-pro"],
+    ["GPT-5.6 Terra", "swePro", 63.4, "swe-bench-pro"],
+    ["GPT-5.6 Terra", "mmmuPro", 80.7, "mmmu-pro"],
+    ["GPT-5.6 Luna", "swePro", 62.7, "swe-bench-pro"],
+    ["GPT-5.6 Luna", "mmmuPro", 78.4, "mmmu-pro"],
+  ]) {
+    assert.match(
+      benchmarkModelBlock(model),
+      new RegExp(
+        `${benchmark}: LLM_STATS_UNDISCLOSED\\(${String(score).replace(".", "\\.")}, "https://llm-stats\\.com/benchmarks/${slug}"\\)`,
+      ),
+      `${model} ${benchmark} should cite the LLM Stats board with the undisclosed-harness caliber`,
+    );
+  }
+  assert.equal(
+    [...source.matchAll(/source: "LLM Stats · 框架未披露"/g)].length,
+    1,
+    "LLM Stats · 框架未披露 should only be defined inside LLM_STATS_UNDISCLOSED",
+  );
   assert.match(source, /model: "Qwen3\.8-Max"[\s\S]*?parameters: "2\.4T \/ 95B 激活"/);
   assert.match(source, /value: "86\.6%"[\s\S]*?Qwen 官方 · Claude Code \/ avg@10/);
   assert.match(source, /value: "67\.7%"[\s\S]*?Qwen 官方 · Claude Code/);
-  assert.match(source, /value: "56\.6%"[\s\S]*?Qwen 官方 · DeepSWE 1\.1 \/ Claude Code/);
+  assert.match(source, /model: "Qwen3\.8-Max"[\s\S]*?value: "57%"[\s\S]*?DeepSWE 官方榜 · mini-swe-agent \/ xhigh/);
   assert.match(source, /value: "55\.9%"[\s\S]*?Qwen 官方 · Claude Code/);
   assert.match(source, /value: "27\.0%"[\s\S]*?Qwen 官方 · Pass \/ Agent 框架未披露/);
   assert.match(source, /value: "86\.1%"[\s\S]*?Qwen 官方 · OSWorld-Verified \/ 框架未披露/);
@@ -605,23 +846,35 @@ test("server-renders the LLM trends research snapshot without live API work", as
   ]) {
     assert.equal(leaderboardRows[board].length, 50, `${board} should store 50 rows`);
   }
-  assert.equal(leaderboardRows["Text-to-Video"].length, 45);
-  assert.equal(leaderboardRows["Intelligence Index v4.1.1"].length, 28);
-  assert.equal(leaderboardRows["Coding Agent Index"].length, 50);
-  assert.equal(leaderboardRows["Agentic Index"].length, 28);
-  assert.equal(leaderboardRows["AA-Briefcase"].length, 19);
-  assert.equal(leaderboardRows["Text / Overall"][45].model, "grok-4.6-high");
+  assert.equal(leaderboardRows["Text-to-Video"].length, 48);
+  assert.equal(leaderboardRows["Intelligence Index v4.3.2"].length, 50);
+  assert.equal(leaderboardRows["Coding Agent Index"].length, 19);
+  assert.equal(leaderboardRows["Agentic Index"].length, 20);
+  assert.equal(leaderboardRows["AA-Briefcase"].length, 15);
+  assert.equal(leaderboardRows["Text / Overall"][48].model, "qwen3.5-max-preview");
   assert.equal(leaderboardRows["Text / Overall"][49].model, "deepseek-v4-pro-high-20260813");
-  assert.equal(leaderboardRows["Text-to-Video"][2].model, "dreamina-seedance-2.0-720p");
-  assert.equal(leaderboardRows["Text-to-Video"][3].model, "dreamina-seedance-2.5-720p");
-  assert.equal(leaderboardRows["Intelligence Index v4.1.1"][3].model, "Grok 4.6 (high)");
-  assert.equal(leaderboardRows["Intelligence Index v4.1.1"][5].model, "GLM-5.3 (max)");
-  assert.equal(leaderboardRows["Intelligence Index v4.1.1"][10].model, "DeepSeek V4 Pro 0813 (max)");
-  assert.equal(leaderboardRows["Coding Agent Index"][33].model, "Codex - DeepSeek V4 Flash 0731 (max)");
-  assert.equal(leaderboardRows["Coding Agent Index"][41].model, "Codex - DeepSeek V4 Pro 0813 (max)");
-  assert.equal(leaderboardRows["Agentic Index"][1].model, "GLM-5.3 (max)");
-  assert.equal(leaderboardRows["Agentic Index"][2].model, "Grok 4.6 (high)");
-  assert.equal(leaderboardRows["Agentic Index"][9].model, "DeepSeek V4 Pro 0813 (max)");
+  assert.equal(leaderboardRows["Text-to-Video"][5].model, "dreamina-seedance-2.5-720p");
+  assert.equal(leaderboardRows["Text-to-Video"][6].model, "dreamina-seedance-2.0-720p");
+  assert.equal(leaderboardRows["Intelligence Index v4.3.2"][0].model, "Claude Opus 5.5 (max with fallback)");
+  assert.equal(leaderboardRows["Intelligence Index v4.3.2"][5].model, "Claude Fable 5.1 (xhigh with fallback)");
+  assert.equal(leaderboardRows["Intelligence Index v4.3.2"][6].model, "GPT-6 Astra (max)");
+  assert.equal(leaderboardRows["Intelligence Index v4.3.2"][8].model, "GPT-6.1 Sol (max)");
+  assert.equal(leaderboardRows["Intelligence Index v4.3.2"][20].model, "Grok 4.7 (xhigh)");
+  assert.equal(leaderboardRows["Intelligence Index v4.3.2"][22].model, "MiMo-V2.6-Pro");
+  assert.equal(leaderboardRows["Intelligence Index v4.3.2"][47].model, "DeepSeek V4 Pro 0813 (max)");
+  assert.equal(leaderboardRows["Intelligence Index v4.3.2"][49].model, "Agnes 2.5 Pro Beta");
+  assert.equal(leaderboardRows["Coding Agent Index"][0].model, "Claude Code - Fable 5.1 (max) (with fallback)");
+  assert.equal(leaderboardRows["Coding Agent Index"][1].model, "Devin Fusion CLI - Claude Fable 5.1 (xhigh + SWE-2 medium)");
+  assert.equal(leaderboardRows["Coding Agent Index"][8].model, "Muse Code - Muse Spark 1.3 (max)");
+  assert.equal(leaderboardRows["Coding Agent Index"][15].model, "Codex - DeepSeek V4 Pro 0813 (max)");
+  assert.equal(leaderboardRows["Coding Agent Index"][18].model, "Codex - DeepSeek V4 Flash 0731 (max)");
+  assert.equal(leaderboardRows["Agentic Index"][1].model, "Claude Opus 5");
+  assert.equal(leaderboardRows["Agentic Index"][2].model, "Muse Spark 1.3");
+  assert.equal(leaderboardRows["Agentic Index"][10].model, "DeepSeek V4 Pro 0813");
+  assert.equal(leaderboardRows["AA-Briefcase"][0].model, "Claude Opus 5.5");
+  assert.equal(leaderboardRows["AA-Briefcase"][1].model, "Claude Sonnet 5.5");
+  assert.equal(leaderboardRows["AA-Briefcase"][2].model, "Claude Opus 5");
+  assert.equal(leaderboardRows["AA-Briefcase"][14].model, "Step 5 Preview");
   assert.match(source, /Qwen 官方未发布 MCP-Atlas \/ Agent 框架/);
   assert.doesNotMatch(source, /label: "AA Coding Agent Index"/);
   assert.match(source, /model: "Claude Opus 4\.6"/);
@@ -636,26 +889,31 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.doesNotMatch(source, /model: "Qwen3\.7-Max"/);
   assert.match(source, /https:\/\/llm-stats\.com\/benchmarks\/swe-bench-pro/);
   assert.match(source, /https:\/\/llm-stats\.com\/benchmarks\/mmmu-pro/);
-  assert.match(styles, /\.trend-benchmark-switch\s*\{[^}]*grid-template-columns: repeat\(3/s);
+  assert.match(refreshedTrendStyles, /\.trend-benchmark-switch\s*\{[^}]*grid-template-columns: repeat\(4/s);
+  assert.match(refreshedTrendStyles, /\.trends-score-row\s*\{[^}]*grid-template-columns: 34px minmax\(0, 1fr\) minmax\(82px, auto\)/s);
+  assert.match(source, /if \(benchmark === "hleTools"\) return \[\.\.\.TEXT_MODELS\]/);
+  assert.match(source, /不同题集与工具配置只展示原始值，不做统一排名/);
+  assert.match(source, /benchmarkIsRanked \? String\(index \+ 1\)\.padStart\(2, "0"\) : "值"/);
+  assert.doesNotMatch(source, /Math\.min\(metric\.score|Math\.min\(referenceMetric\.score/);
   assert.doesNotMatch(styles, /\.trends-focus-switch button\.is-featured/);
   assert.match(styles, /\.trends-score-row\.is-reference\s*\{/);
   assert.match(styles, /\.trends-score-row\.is-na:not\(\.is-reference\)\s*\{/);
   assert.match(html, /LMArena/);
-  assert.match(html, /Intelligence Index v4\.1\.1/);
+  assert.match(html, /Intelligence Index v4\.3\.2/);
   assert.match(html, /Coding Agent Index/);
   assert.match(html, /Agentic Index/);
   assert.match(html, /AA-Briefcase/);
   assert.match(html, /评估方法/);
   assert.match(html, /权重 \/ 口径/);
   assert.match(html, /Agents/);
-  assert.match(html, /34%/);
+  assert.match(html, /30%/);
   assert.match(html, /Coding/);
-  assert.match(html, /24%/);
+  assert.match(html, /20%/);
   assert.match(html, /科学推理/);
   assert.match(html, /通用能力/);
-  assert.match(html, /9 项基准按 4 类不等权合成/);
-  assert.match(source, /2026-08-25 · v1\.4 · model \+ harness/);
-  assert.match(source, /89 项 Agent 终端任务/);
+  assert.match(html, /10 项基准按 4 类不等权合成/);
+  assert.match(source, /2026-09-22 · v1\.5 · model \+ harness/);
+  assert.match(source, /66 项 Agent 终端任务/);
   for (const board of [
     "Text / Overall",
     "Coding Arena",
@@ -670,7 +928,7 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.match(source, /trend-board-switch/);
   for (const methodology of [
     "DeepSWE",
-    "GDPval-AA v2",
+    "GDPval-AA v2.1",
     "Pairwise Elo",
     "Bradley–Terry",
     "约 15%",
@@ -686,6 +944,434 @@ test("server-renders the LLM trends research snapshot without live API work", as
   assert.match(styles, /\.trend-board-assessment table\s*\{[^}]*table-layout: fixed/s);
   assert.match(styles, /\.trend-board-assessment tr\.is-emphasis/s);
   assert.match(html, /静态快照，不自动抓榜或调用 API/);
+
+  // ---- Pelican Test module (community informal benchmark, demo) ----
+  const pelicanPanelSource = await readFile(
+    new URL("../app/components/PelicanTestPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  const pelicanSharedSource = await readFile(
+    new URL("../app/lib/pelican-shared.ts", import.meta.url),
+    "utf8",
+  );
+  const pelicanRenderSource = await readFile(
+    new URL("../app/lib/pelican-render.ts", import.meta.url),
+    "utf8",
+  );
+
+  // Section renders and sits strictly between leaderboards and trend-sources.
+  assert.match(html, /id="pelican-test"/);
+  assert.ok(
+    html.indexOf('id="leaderboards"') < html.indexOf('id="pelican-test"'),
+    "pelican-test must come after leaderboards",
+  );
+  assert.ok(
+    html.indexOf('id="pelican-test"') < html.indexOf('id="trend-sources"'),
+    "pelican-test must come before trend-sources",
+  );
+  assert.match(html, /鹈鹕测试/);
+
+  // Verbatim community prompt is the single source of truth in the shared lib.
+  assert.match(
+    pelicanSharedSource,
+    /PELICAN_PROMPT = "Generate an SVG of a pelican riding a bicycle"/,
+  );
+  assert.match(
+    pelicanSharedSource,
+    /PELICAN_CREDENTIAL_KEY = "seedance-workbench:demo-credentials:v1"/,
+  );
+  assert.match(
+    pelicanSharedSource,
+    /PELICAN_HISTORY_KEY = "llm-trends:pelican-history:v1"/,
+  );
+  assert.match(pelicanSharedSource, /PELICAN_MAX_HISTORY = 30/);
+    // Reasoning models bill thinking against max_output_tokens: headroom plus
+    // an explicit incomplete/length diagnostic when the SVG gets truncated.
+    assert.match(pelicanSharedSource, /PELICAN_GENERATION_MAX_TOKENS = 32768/);
+    assert.match(pelicanSharedSource, /describeTruncatedGeneration/);
+    assert.match(pelicanPanelSource, /describeTruncatedGeneration/);
+    // The judge step gets the same reasoning headroom and a truncation
+    // diagnostic, so a length-truncated judge is not misreported as an
+    // unparseable scoring JSON.
+    assert.match(pelicanSharedSource, /PELICAN_JUDGE_MAX_TOKENS = 16384/);
+    assert.match(pelicanSharedSource, /describeTruncatedJudgement/);
+    assert.match(pelicanPanelSource, /describeTruncatedJudgement/);
+
+  // Panel consumes the fixed prompt, shared slots, and gate on cost confirm.
+  assert.match(pelicanPanelSource, /PELICAN_PROMPT/);
+  assert.match(pelicanPanelSource, /PELICAN_CREDENTIAL_KEY/);
+  assert.match(pelicanPanelSource, /PELICAN_HISTORY_KEY/);
+  assert.match(pelicanPanelSource, /PELICAN_MAX_HISTORY/);
+  assert.match(pelicanPanelSource, /costConfirmed/);
+  assert.match(pelicanPanelSource, /2 次真实 Responses API 创建/);
+
+  // Manual Base URL: prefilled with the shared default, sent to the dedicated
+  // create-only proxy; the shared /api/responses route stays fixed-URL.
+  assert.match(
+    pelicanSharedSource,
+    /PELICAN_BASE_URL = "https:\/\/ark\.cn-beijing\.volces\.com\/api\/v3"/,
+  );
+  assert.match(pelicanPanelSource, /useState\(PELICAN_BASE_URL\)/);
+  assert.match(pelicanPanelSource, /Base URL（手动填写）/);
+  assert.match(pelicanPanelSource, /fetch\("\/api\/pelican\/responses"/);
+  assert.match(pelicanPanelSource, /JSON\.stringify\(\{ apiKey, baseUrl, requestBody \}\)/);
+  assert.doesNotMatch(pelicanPanelSource, /fetch\("\/api\/responses"/);
+
+  // Sandboxed iframe preview, judge-mode radios, fixed store/stream.
+  assert.match(pelicanPanelSource, /sandbox=""/);
+  assert.match(pelicanPanelSource, /srcDoc=\{view\.svg\}/);
+  assert.match(pelicanPanelSource, /name="pelican-judge-mode"/);
+  assert.match(pelicanPanelSource, /setJudgeMode\("vision"\)/);
+  assert.match(pelicanPanelSource, /setJudgeMode\("source"\)/);
+  assert.match(pelicanPanelSource, /store: false/);
+  assert.match(pelicanPanelSource, /stream: false/);
+
+  // Vision judge sends the locally rasterized PNG as an input_image data URL.
+  assert.match(pelicanSharedSource, /type: "input_image"/);
+  assert.match(pelicanSharedSource, /image_url: pngDataUrl/);
+  assert.match(pelicanPanelSource, /buildVisionJudgeInput/);
+
+  // Rasterizer stays in-browser: PNG output, 900KB guard, 10s timeout.
+  assert.match(pelicanRenderSource, /toDataURL\("image\/png"\)/);
+  assert.match(pelicanRenderSource, /900 \* 1024/);
+  assert.match(pelicanRenderSource, /10_000/);
+  assert.match(pelicanRenderSource, /createObjectURL/);
+  assert.doesNotMatch(pelicanRenderSource, /import\s+"server-only"/);
+
+  // New Pelican CSS selectors exist; mobile collapses preview to one column.
+  assert.match(styles, /\.trends-pelican-section\s*\{/);
+  assert.match(styles, /\.pelican-panel\s*\{/);
+  assert.match(styles, /\.pelican-preview-frame/);
+  assert.match(styles, /\.pelican-dim-bar\s*\{/);
+  assert.match(styles, /\.pelican-table\s*\{/);
+  assert.match(styles, /\.pelican-badge\.is-vision\s*\{/);
+  assert.match(
+    styles,
+    /\.pelican-preview \{\s*grid-template-columns: minmax\(0, 1fr\);\s*\}/,
+  );
+});
+
+test("archives and reads Pelican Test bundles through the signed TOS route", async () => {
+  const originalFetch = globalThis.fetch;
+  const previous = {
+    access: process.env.VOLC_ACCESS_KEY,
+    secret: process.env.VOLC_SECRET_KEY,
+    bucket: process.env.TOS_BUCKET,
+    endpoint: process.env.TOS_ENDPOINT,
+    region: process.env.TOS_REGION,
+    prefix: process.env.TOS_PREFIX,
+  };
+  process.env.VOLC_ACCESS_KEY = "test-access-key-not-real";
+  process.env.VOLC_SECRET_KEY = "test-secret-key-not-real";
+  process.env.TOS_BUCKET = "hh-tos-test";
+  process.env.TOS_ENDPOINT = "https://hh-tos-test.tos-cn-beijing.volces.com";
+  process.env.TOS_REGION = "cn-beijing";
+  process.env.TOS_PREFIX = "demo/";
+
+  const upstreamRequests = [];
+  const tosObjects = new Map();
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input);
+    const method = init.method ?? "GET";
+    upstreamRequests.push({ url, init, method });
+    assert.match(
+      url,
+      /^https:\/\/hh-tos-test\.tos-cn-beijing\.volces\.com\/demo\/pelican\//,
+    );
+    const parsed = new URL(url);
+    const key = decodeURIComponent(parsed.pathname.slice(1));
+    if (method === "PUT") {
+      assert.equal(init.redirect, "manual");
+      assert.match(url, /X-Tos-Algorithm=TOS4-HMAC-SHA256/);
+      assert.match(url, /X-Tos-Signature=[a-f0-9]{64}/);
+      const text =
+        typeof init.body === "string"
+          ? init.body
+          : new TextDecoder().decode(init.body);
+      tosObjects.set(key, text);
+      return new Response(null, { status: 200 });
+    }
+    if (tosObjects.has(key)) {
+      return new Response(tosObjects.get(key), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response("<Error><Code>NoSuchKey</Code></Error>", {
+      status: 404,
+      headers: { "x-tos-request-id": "test-pelican-missing" },
+    });
+  };
+
+  try {
+    const validRunId = "pel-20260923120000-ab12cd34";
+    const bundle = {
+      runId: validRunId,
+      model: "doubao-seed-2-1-pro-260628",
+      judgeModel: "doubao-seed-2-1-pro-260628",
+      judgeMode: "vision",
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>',
+      scores: { species: 8, bicycle: 7, posture: 6, interaction: 6, svgValidity: 9 },
+      overall: 7.2,
+      comments: "喙部特征明显，车架完整。",
+      renderMeta: { ok: true, width: 1024, height: 1024, bytes: 20480 },
+      usage: { inputTokens: 120, outputTokens: 340 },
+      createdAt: "2026-09-23T12:00:00.000Z",
+    };
+
+    const saved = await request("/api/pelican/tos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(bundle),
+    });
+    assert.equal(saved.status, 201, await saved.clone().text());
+    const savedPayload = await saved.json();
+    assert.equal(savedPayload.objectKey, `demo/pelican/${validRunId}.json`);
+    assert.ok(savedPayload.size > 0);
+    const putRequest = upstreamRequests.at(-1);
+    assert.equal(putRequest.method, "PUT");
+    assert.equal(putRequest.init.redirect, "manual");
+    assert.equal(putRequest.init.headers["content-type"], "application/json");
+
+    const signed = await request(
+      `/api/pelican/tos?key=${encodeURIComponent(savedPayload.objectKey)}`,
+    );
+    assert.equal(signed.status, 200);
+    const signedPayload = await signed.json();
+    assert.match(
+      signedPayload.url,
+      /^https:\/\/hh-tos-test\.tos-cn-beijing\.volces\.com\/demo\/pelican\/.*X-Tos-Expires=3600.*X-Tos-Signature=/,
+    );
+    assert.equal(signedPayload.expiresIn, 3_600);
+    assert.equal(signed.headers.get("cache-control"), "no-store");
+
+    const readBack = await request(
+      `/api/pelican/tos?key=${encodeURIComponent(savedPayload.objectKey)}&content=bundle`,
+    );
+    assert.equal(readBack.status, 200);
+    const readPayload = await readBack.json();
+    assert.equal(readPayload.runId, validRunId);
+    assert.equal(readPayload.judgeMode, "vision");
+    assert.equal(readPayload.scores.species, 8);
+
+    const badRunId = await request("/api/pelican/tos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...bundle, runId: "not-a-run-id" }),
+    });
+    assert.equal(badRunId.status, 400);
+
+    const leaked = await request("/api/pelican/tos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...bundle, apiKey: "should-be-rejected" }),
+    });
+    assert.equal(leaked.status, 400);
+
+    const badMode = await request("/api/pelican/tos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...bundle, judgeMode: "telepathy" }),
+    });
+    assert.equal(badMode.status, 400);
+
+    const badScore = await request("/api/pelican/tos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...bundle,
+        scores: { ...bundle.scores, species: 42 },
+      }),
+    });
+    assert.equal(badScore.status, 400);
+
+    const badKey = await request(
+      `/api/pelican/tos?key=${encodeURIComponent("demo/image/generated/deadbeef.png")}`,
+    );
+    assert.equal(badKey.status, 400);
+
+    const missing = await request(
+      `/api/pelican/tos?key=${encodeURIComponent("demo/pelican/pel-20260923120000-ffffffff.json")}&content=bundle`,
+    );
+    assert.equal(missing.status, 404);
+
+    const savedAccess = process.env.VOLC_ACCESS_KEY;
+    delete process.env.VOLC_ACCESS_KEY;
+    const noEnv = await request(
+      `/api/pelican/tos?key=${encodeURIComponent(savedPayload.objectKey)}`,
+    );
+    assert.equal(noEnv.status, 502);
+    restoreEnv("VOLC_ACCESS_KEY", savedAccess);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv("VOLC_ACCESS_KEY", previous.access);
+    restoreEnv("VOLC_SECRET_KEY", previous.secret);
+    restoreEnv("TOS_BUCKET", previous.bucket);
+    restoreEnv("TOS_ENDPOINT", previous.endpoint);
+    restoreEnv("TOS_REGION", previous.region);
+    restoreEnv("TOS_PREFIX", previous.prefix);
+  }
+});
+
+test("proxies Pelican creates through the dedicated manual-Base-URL route", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  const apiKey = "test-pelican-key-not-real";
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    calls.push({ url, init });
+    if (url === "https://custom-gateway.example.com/ark/v3/responses") {
+      return new Response(
+        JSON.stringify({
+          id: "resp_pelican_test",
+          status: "completed",
+          output_text: "<svg></svg> echo " + apiKey,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    return new Response(
+      JSON.stringify({ error: { message: "upstream rejected " + apiKey } }),
+      { status: 429, headers: { "content-type": "application/json" } },
+    );
+  };
+
+  try {
+    const validBody = {
+      apiKey,
+      baseUrl: "https://custom-gateway.example.com/ark/v3/",
+      requestBody: {
+        model: "glm-5-3-flash-260828",
+        input: "Generate an SVG of a pelican riding a bicycle",
+        max_output_tokens: 32768,
+        store: false,
+        stream: false,
+      },
+    };
+
+    const ok = await request("/api/pelican/responses", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(validBody),
+    });
+    assert.equal(ok.status, 200, await ok.clone().text());
+    const okPayload = await ok.json();
+    assert.equal(okPayload.id, "resp_pelican_test");
+    // Trailing slash normalized; key redacted from the upstream echo.
+    assert.equal(calls[0].url, "https://custom-gateway.example.com/ark/v3/responses");
+    assert.equal(calls[0].init.headers.authorization, `Bearer ${apiKey}`);
+    assert.ok(!JSON.stringify(okPayload).includes(apiKey));
+    assert.match(okPayload.output_text, /\[REDACTED\]/);
+
+    // Upstream status passes through untouched, secrets still redacted.
+    const rejected = await request("/api/pelican/responses", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...validBody,
+        baseUrl: "https://upstream-error.example.com/api/v3",
+      }),
+    });
+    assert.equal(rejected.status, 429);
+    assert.ok(!(await rejected.text()).includes(apiKey));
+
+    // Validation gates: bad scheme, embedded credentials, query string,
+    // store/stream not false, and unopened body fields all yield 400.
+    const invalidPayloads = [
+      { ...validBody, baseUrl: "ftp://gateway.example.com/api/v3" },
+      { ...validBody, baseUrl: "https://user:pass@gateway.example.com/v3" },
+      { ...validBody, baseUrl: "https://gateway.example.com/v3?debug=1" },
+      { ...validBody, baseUrl: "not a url" },
+      {
+        ...validBody,
+        requestBody: { ...validBody.requestBody, store: true },
+      },
+      {
+        ...validBody,
+        requestBody: { ...validBody.requestBody, stream: true },
+      },
+      {
+        ...validBody,
+        requestBody: { ...validBody.requestBody, tools: [] },
+      },
+    ];
+    for (const payload of invalidPayloads) {
+      const response = await request("/api/pelican/responses", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      assert.equal(response.status, 400, JSON.stringify(payload.baseUrl));
+      assert.ok(!(await response.text()).includes(apiKey));
+    }
+
+    // Vision judge shape passes: array input with a PNG data URL plus a
+    // strict json_schema text format.
+    const judge = await request("/api/pelican/responses", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        apiKey,
+        baseUrl: "https://custom-gateway.example.com/ark/v3",
+        requestBody: {
+          model: "doubao-seed-2-1-pro-260915",
+          input: [
+            {
+              role: "user",
+              content: [
+                { type: "input_text", text: "rate this" },
+                {
+                  type: "input_image",
+                  image_url: "data:image/png;base64,AAAA",
+                  detail: "auto",
+                },
+              ],
+            },
+          ],
+          text: {
+            format: {
+              type: "json_schema",
+              name: "pelican_judgement",
+              schema: { type: "object" },
+              strict: true,
+            },
+          },
+          max_output_tokens: 2048,
+          store: false,
+          stream: false,
+        },
+      }),
+    });
+    assert.equal(judge.status, 200, await judge.clone().text());
+
+    // Non-HTTPS image URLs inside array input are rejected.
+    const badImageUrl = await request("/api/pelican/responses", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        apiKey,
+        baseUrl: "https://custom-gateway.example.com/ark/v3",
+        requestBody: {
+          model: "doubao-seed-2-1-pro-260915",
+          input: [
+            {
+              role: "user",
+              content: [
+                { type: "input_image", image_url: "http://insecure.example.com/a.png" },
+              ],
+            },
+          ],
+          max_output_tokens: 2048,
+          store: false,
+          stream: false,
+        },
+      }),
+    });
+    assert.equal(badImageUrl.status, 400);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("server-renders all editable Seedream tutorial examples except the excluded appendix", async () => {

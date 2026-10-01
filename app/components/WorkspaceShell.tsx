@@ -106,6 +106,7 @@ function viewFromHash(): WorkspaceView {
       "#model-landscape",
       "#benchmark-lens",
       "#leaderboards",
+      "#pelican-test",
       "#trend-sources",
     ].some((anchor) => hash.startsWith(anchor))
   ) {
